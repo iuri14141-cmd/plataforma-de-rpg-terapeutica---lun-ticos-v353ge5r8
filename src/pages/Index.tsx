@@ -165,9 +165,13 @@ function ProtectedTestAccess({
                   const result = await probeTestAccess('participant-b')
                   setProbe(result)
                 } catch (requestError) {
+                  const errorBody =
+                    (requestError as { response?: { data?: Partial<ProbeResult> } })?.response
+                      ?.data ?? {}
                   setProbe({
                     outcome: 'denied',
-                    error: getErrorMessage(requestError),
+                    rule_id: errorBody.rule_id,
+                    error: errorBody.error ?? getErrorMessage(requestError),
                   })
                 } finally {
                   setProbing(false)
