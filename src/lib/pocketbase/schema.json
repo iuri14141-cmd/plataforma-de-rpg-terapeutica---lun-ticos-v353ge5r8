@@ -29,19 +29,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "fixture_key",
@@ -61,21 +56,14 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "champion",
-            "participant",
-            "administrador_tecnico_condicionado"
-          ]
+          "selectValues": ["champion", "participant", "administrador_tecnico_condicionado"]
         },
         {
           "name": "access_status",
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "active",
-            "revoked"
-          ]
+          "selectValues": ["active", "revoked"]
         }
       ],
       "indexes": [
@@ -117,9 +105,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "access-isolation"
-          ]
+          "selectValues": ["access-isolation"]
         },
         {
           "name": "is_synthetic",
@@ -132,19 +118,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": [
@@ -186,11 +167,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "champion",
-            "participant",
-            "administrador_tecnico_condicionado"
-          ]
+          "selectValues": ["champion", "participant", "administrador_tecnico_condicionado"]
         },
         {
           "name": "tenant_id",
@@ -204,10 +181,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "active",
-            "revoked"
-          ]
+          "selectValues": ["active", "revoked"]
         },
         {
           "name": "is_synthetic",
@@ -220,19 +194,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "user_id",
@@ -276,11 +245,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "list",
-            "view",
-            "probe"
-          ]
+          "selectValues": ["list", "view", "probe"]
         },
         {
           "name": "target_type",
@@ -299,10 +264,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "allowed",
-            "denied"
-          ]
+          "selectValues": ["allowed", "denied"]
         },
         {
           "name": "rule_id",
@@ -327,19 +289,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": [

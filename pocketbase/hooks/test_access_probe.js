@@ -69,12 +69,14 @@ routerAdd(
         error: 'recurso fora do contexto autorizado',
         outcome: 'denied',
         rule_id: 'RN-1.02',
+        audit_event_id: eventId,
       })
     }
 
     return e.json(200, {
       outcome: 'allowed',
       rule_id: 'RN-1.03',
+      audit_event_id: eventId,
       identity: {
         id: identity.id,
         fixture_key: identity.getString('fixture_key'),
