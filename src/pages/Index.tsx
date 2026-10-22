@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { getErrorMessage } from '@/lib/pocketbase/errors'
 import { useAuth } from '@/hooks/use-auth'
 import { getAccessibleTestIdentities, type TestIdentity } from '@/services/testAccess'
+import { probeTestAccess, type ProbeResult } from '@/services/probe'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -109,6 +110,8 @@ function ProtectedTestAccess({
   const [identities, setIdentities] = useState<TestIdentity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [probe, setProbe] = useState<ProbeResult | null>(null)
+  const [probing, setProbing] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -145,6 +148,54 @@ function ProtectedTestAccess({
             Sair
           </Button>
         </header>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Sonda de isolamento (server-side)</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            O servidor decide pela associação real da sessão; valores de tenant ou papel enviados
+            pelo cliente não são aceitos como autoridade.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button
+              disabled={probing}
+              onClick={async () => {
+                setProbing(true)
+                setProbe(null)
+                try {
+                  const result = await probeTestAccess('participant-b')
+                  setProbe(result)
+                } catch (requestError) {
+                  setProbe({
+                    outcome: 'denied',
+                    error: getErrorMessage(requestError),
+                  })
+                } finally {
+                  setProbing(false)
+                }
+              }}
+            >
+              {probing ? 'Consultando…' : 'Tentar acessar tenant B (participant-b)'}
+            </Button>
+            {probe && (
+              <span
+                className={
+                  probe.outcome === 'allowed'
+                    ? 'rounded-full bg-emerald-950 px-3 py-1 text-xs text-emerald-200'
+                    : 'rounded-full bg-red-950 px-3 py-1 text-xs text-red-200'
+                }
+              >
+                {probe.outcome === 'allowed'
+                  ? 'permitido'
+                  : `negado · ${probe.rule_id || 'sem regra'}`}
+              </span>
+            )}
+          </div>
+          {probe?.error && (
+            <p role="alert" className="mt-3 text-sm text-red-300">
+              {probe.error}
+            </p>
+          )}
+        </section>
 
         <section className="mt-8 rounded-2xl border border-cyan-900/60 bg-cyan-950/20 p-5">
           <p className="text-sm leading-6 text-cyan-100">

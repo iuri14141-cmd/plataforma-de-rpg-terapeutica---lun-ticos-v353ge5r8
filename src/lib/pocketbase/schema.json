@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-24T22:15:55.461Z",
+  "generatedAt": "2026-10-22T07:18:32.994Z",
   "collections": [
     {
       "name": "users",
@@ -246,6 +246,106 @@
         "CREATE UNIQUE INDEX idx_test_identities_fixture_key ON test_identities (fixture_key)",
         "CREATE UNIQUE INDEX idx_test_identities_email ON test_identities (email)",
         "CREATE INDEX idx_test_identities_tenant ON test_identities (tenant_id)"
+      ]
+    },
+    {
+      "name": "audit_events",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "event_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "request_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "action",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "list",
+            "view",
+            "probe"
+          ]
+        },
+        {
+          "name": "target_type",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "outcome",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "allowed",
+            "denied"
+          ]
+        },
+        {
+          "name": "rule_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "actor_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tenant_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_audit_events_event_id ON audit_events (event_id)",
+        "CREATE UNIQUE INDEX idx_audit_events_request_id ON audit_events (request_id)",
+        "CREATE INDEX idx_audit_events_outcome_created ON audit_events (outcome, created)"
       ]
     }
   ]
