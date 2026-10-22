@@ -165,12 +165,16 @@ function ProtectedTestAccess({
                   const result = await probeTestAccess('participant-b')
                   setProbe(result)
                 } catch (requestError) {
-                  const errorBody =
-                    (requestError as { response?: { data?: Partial<ProbeResult> } })?.response
-                      ?.data ?? {}
+                  // ClientResponseError.response é o corpo completo da resposta;
+                  // err.data é alias de err.response (guia do SDK do Skip).
+                  const err = requestError as {
+                    response?: Partial<ProbeResult> & { data?: Partial<ProbeResult> }
+                    data?: Partial<ProbeResult>
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
                   setProbe({
                     outcome: 'denied',
-                    rule_id: errorBody.rule_id,
+                    rule_id: errorBody.rule_id ?? errorBody.data?.rule_id,
                     error: errorBody.error ?? getErrorMessage(requestError),
                   })
                 } finally {
