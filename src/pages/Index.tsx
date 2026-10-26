@@ -6,6 +6,13 @@ import { useAuth } from '@/hooks/use-auth'
 import { getAccessibleTestIdentities, type TestIdentity } from '@/services/testAccess'
 import { probeTestAccess, type ProbeResult } from '@/services/probe'
 import { createTestInterest, type TestInterest } from '@/services/interests'
+import {
+  promoteTestParticipant,
+  updateTestParticipant,
+  getParticipantEvents,
+  type TestParticipant,
+  type ParticipantEvent,
+} from '@/services/participants'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -118,6 +125,12 @@ function ProtectedTestAccess({
   const [interest, setInterest] = useState<TestInterest | null>(null)
   const [interestError, setInterestError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [participants, setParticipants] = useState<TestParticipant[]>([])
+  const [timelineFor, setTimelineFor] = useState<string | null>(null)
+  const [timeline, setTimeline] = useState<ParticipantEvent[]>([])
+  const [participantMessage, setParticipantMessage] = useState('')
+  const [participantError, setParticipantError] = useState('')
+  const [workingParticipant, setWorkingParticipant] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -300,6 +313,222 @@ function ProtectedTestAccess({
               </dl>
             </div>
           )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Participantes de teste</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Promova um interesse do seu tenant a participante, corrija a ficha e acompanhe a linha
+            do tempo. Eventos são append-only: a origem nunca é apagada.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              disabled={workingParticipant || !interest}
+              onClick={async () => {
+                if (!interest) return
+                setWorkingParticipant(true)
+                setParticipantError('')
+                setParticipantMessage('')
+                try {
+                  const result = await promoteTestParticipant(interest.interest_id)
+                  setParticipants((prev) => [
+                    ...prev.filter((p) => p.participant_id !== result.participant_id),
+                    result,
+                  ])
+                  setParticipantMessage(
+                    result.already_registered
+                      ? 'Participante já existia para este interesse (idempotente).'
+                      : 'Participante registrado a partir do interesse.',
+                  )
+                } catch (requestError) {
+                  const err = requestError as {
+                    response?: { error?: string }
+                    data?: { error?: string }
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
+                  setParticipantError(errorBody.error ?? getErrorMessage(requestError))
+                } finally {
+                  setWorkingParticipant(false)
+                }
+              }}
+            >
+              {workingParticipant ? 'Processando…' : 'Promover interesse a participante'}
+            </Button>
+          </div>
+          {participantError && (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {participantError}
+            </p>
+          )}
+          {participantMessage && (
+            <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+              {participantMessage}
+            </p>
+          )}
+          {participants.map((participant) => (
+            <article
+              key={participant.participant_id}
+              className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-slate-100">{participant.display_name}</h3>
+                  <p className="text-xs text-slate-400">{participant.contact_key}</p>
+                </div>
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  {participant.lifecycle_status}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={workingParticipant}
+                  onClick={async () => {
+                    setWorkingParticipant(true)
+                    setParticipantError('')
+                    try {
+                      const result = await updateTestParticipant(participant.participant_id, {
+                        display_name: `${participant.display_name} (corrigido)`,
+                      })
+                      setParticipants((prev) =>
+                        prev.map((p) =>
+                          p.participant_id === result.participant_id
+                            ? { ...p, display_name: result.display_name }
+                            : p,
+                        ),
+                      )
+                      setParticipantMessage(`Ficha corrigida · evento ${result.event_type}`)
+                    } catch (requestError) {
+                      const err = requestError as {
+                        response?: { error?: string }
+                        data?: { error?: string }
+                      }
+                      const errorBody = err?.response ?? err?.data ?? {}
+                      setParticipantError(errorBody.error ?? getErrorMessage(requestError))
+                    } finally {
+                      setWorkingParticipant(false)
+                    }
+                  }}
+                >
+                  Corrigir nome
+                </Button>
+                {participant.lifecycle_status !== 'cancelled' && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingParticipant}
+                    onClick={async () => {
+                      setWorkingParticipant(true)
+                      setParticipantError('')
+                      try {
+                        const result = await updateTestParticipant(participant.participant_id, {
+                          action: 'cancel',
+                          reason: 'cancelamento de teste',
+                        })
+                        setParticipants((prev) =>
+                          prev.map((p) =>
+                            p.participant_id === result.participant_id
+                              ? { ...p, lifecycle_status: result.lifecycle_status }
+                              : p,
+                          ),
+                        )
+                        setParticipantMessage(`Cancelado · evento ${result.event_type}`)
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setParticipantError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingParticipant(false)
+                      }
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+                {participant.lifecycle_status === 'cancelled' && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingParticipant}
+                    onClick={async () => {
+                      setWorkingParticipant(true)
+                      setParticipantError('')
+                      try {
+                        const result = await updateTestParticipant(participant.participant_id, {
+                          action: 'reopen',
+                          reason: 'reabertura de teste',
+                        })
+                        setParticipants((prev) =>
+                          prev.map((p) =>
+                            p.participant_id === result.participant_id
+                              ? { ...p, lifecycle_status: result.lifecycle_status }
+                              : p,
+                          ),
+                        )
+                        setParticipantMessage(`Reaberto · evento ${result.event_type}`)
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setParticipantError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingParticipant(false)
+                      }
+                    }}
+                  >
+                    Reabrir
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={workingParticipant}
+                  onClick={async () => {
+                    setWorkingParticipant(true)
+                    setParticipantError('')
+                    try {
+                      const events = await getParticipantEvents(participant.participant_id)
+                      setTimeline(events)
+                      setTimelineFor(participant.participant_id)
+                    } catch (requestError) {
+                      const err = requestError as {
+                        response?: { error?: string }
+                        data?: { error?: string }
+                      }
+                      const errorBody = err?.response ?? err?.data ?? {}
+                      setParticipantError(errorBody.error ?? getErrorMessage(requestError))
+                    } finally {
+                      setWorkingParticipant(false)
+                    }
+                  }}
+                >
+                  Ver linha do tempo
+                </Button>
+              </div>
+              {timelineFor === participant.participant_id && (
+                <ol className="mt-4 space-y-2 border-l border-slate-700 pl-4 text-sm text-slate-300">
+                  {timeline.map((item) => (
+                    <li key={item.id}>
+                      <span className="font-medium text-cyan-300">{item.event_type}</span>
+                      {' · '}
+                      <span className="text-slate-400">
+                        {item.created} · ator {item.actor_id} · request {item.request_id}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </article>
+          ))}
         </section>
 
         <section className="mt-8 rounded-2xl border border-cyan-900/60 bg-cyan-950/20 p-5">
