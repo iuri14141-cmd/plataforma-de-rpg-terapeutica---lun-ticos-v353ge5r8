@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { getAccessibleTestIdentities, type TestIdentity } from '@/services/testAccess'
 import { probeTestAccess, type ProbeResult } from '@/services/probe'
 import { createTestInterest, type TestInterest } from '@/services/interests'
+import { getLatestTenantInterest } from '@/services/interestQuery'
 import {
   promoteTestParticipant,
   updateTestParticipant,
@@ -323,14 +324,22 @@ function ProtectedTestAccess({
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
-              disabled={workingParticipant || !interest}
+              disabled={workingParticipant}
               onClick={async () => {
-                if (!interest) return
                 setWorkingParticipant(true)
                 setParticipantError('')
                 setParticipantMessage('')
                 try {
-                  const result = await promoteTestParticipant(interest.interest_id)
+                  // O interesse vem do servidor (mais recente do tenant),
+                  // não do estado em memória da página.
+                  const latest = interest ?? (await getLatestTenantInterest())
+                  if (!latest) {
+                    setParticipantError(
+                      'Nenhum interesse registrado neste tenant. Registre um interesse primeiro.',
+                    )
+                    return
+                  }
+                  const result = await promoteTestParticipant(latest.interest_id)
                   setParticipants((prev) => [
                     ...prev.filter((p) => p.participant_id !== result.participant_id),
                     result,
