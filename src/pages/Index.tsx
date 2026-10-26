@@ -5,6 +5,7 @@ import { getErrorMessage } from '@/lib/pocketbase/errors'
 import { useAuth } from '@/hooks/use-auth'
 import { getAccessibleTestIdentities, type TestIdentity } from '@/services/testAccess'
 import { probeTestAccess, type ProbeResult } from '@/services/probe'
+import { createTestInterest, type TestInterest } from '@/services/interests'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -112,6 +113,11 @@ function ProtectedTestAccess({
   const [error, setError] = useState('')
   const [probe, setProbe] = useState<ProbeResult | null>(null)
   const [probing, setProbing] = useState(false)
+  const [interestName, setInterestName] = useState('')
+  const [interestContact, setInterestContact] = useState('')
+  const [interest, setInterest] = useState<TestInterest | null>(null)
+  const [interestError, setInterestError] = useState('')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -202,6 +208,97 @@ function ProtectedTestAccess({
             <p role="alert" className="mt-3 text-sm text-red-300">
               {probe.error}
             </p>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Entrada de interesse de teste</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Registra uma solicitação sintética no seu tenant. Use apenas dados de teste
+            (@tests.invalid); nenhum dado real é coletado nesta fase.
+          </p>
+          <form
+            className="mt-4 grid gap-4 sm:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              setInterestError('')
+              setInterest(null)
+              setCreating(true)
+              try {
+                const result = await createTestInterest(interestName.trim(), interestContact.trim())
+                setInterest(result)
+              } catch (requestError) {
+                const err = requestError as {
+                  response?: { error?: string }
+                  data?: { error?: string }
+                }
+                const errorBody = err?.response ?? err?.data ?? {}
+                setInterestError(errorBody.error ?? getErrorMessage(requestError))
+              } finally {
+                setCreating(false)
+              }
+            }}
+          >
+            <label className="block text-sm font-medium text-slate-200">
+              Nome sintético
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={interestName}
+                onChange={(event) => setInterestName(event.target.value)}
+                placeholder="Ana Teste A"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-200">
+              Chave de contato sintética
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={interestContact}
+                onChange={(event) => setInterestContact(event.target.value)}
+                placeholder="ana.a@tests.invalid"
+                required
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={creating}>
+                {creating ? 'Registrando…' : 'Registrar interesse de teste'}
+              </Button>
+            </div>
+          </form>
+          {interestError && (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {interestError}
+            </p>
+          )}
+          {interest && (
+            <div className="mt-4 rounded-lg border border-emerald-900 bg-emerald-950/40 p-4 text-sm text-emerald-100">
+              <p className="font-semibold">Solicitação registrada</p>
+              <dl className="mt-2 space-y-1 text-slate-200">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">ID</dt>
+                  <dd>{interest.interest_id}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Estado</dt>
+                  <dd>{interest.status}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Request</dt>
+                  <dd>{interest.request_id}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Timestamp</dt>
+                  <dd>{interest.created_at}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Auditoria</dt>
+                  <dd>{interest.audit_event_id}</dd>
+                </div>
+              </dl>
+            </div>
           )}
         </section>
 
