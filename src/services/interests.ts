@@ -1,6 +1,7 @@
 import pb from '@/lib/pocketbase/client'
 
 export type TestInterest = {
+  duplicate?: boolean
   interest_id: string
   fixture_key: string
   display_name: string

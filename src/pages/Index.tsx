@@ -241,6 +241,11 @@ function ProtectedTestAccess({
               try {
                 const result = await createTestInterest(interestName.trim(), interestContact.trim())
                 setInterest(result)
+                if (result.duplicate) {
+                  setInterestError(
+                    'Solicitação já existente para esta chave neste tenant (idempotente).',
+                  )
+                }
               } catch (requestError) {
                 const err = requestError as {
                   response?: { error?: string }
