@@ -20,6 +20,15 @@ import {
   listTenantMissions,
   type TestMission,
 } from '@/services/missions'
+import {
+  createTestMissionLink,
+  removeTestMissionLink,
+  listTenantMissionLinks,
+  listTenantParticipants,
+  getParticipantMissionView,
+  type MissionLink,
+  type TenantParticipant,
+} from '@/services/missionLinks'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -145,6 +154,13 @@ function ProtectedTestAccess({
   const [missionMessage, setMissionMessage] = useState('')
   const [missionError, setMissionError] = useState('')
   const [workingMission, setWorkingMission] = useState(false)
+  const [links, setLinks] = useState<MissionLink[]>([])
+  const [tenantParticipants, setTenantParticipants] = useState<TenantParticipant[]>([])
+  const [linkMissionId, setLinkMissionId] = useState('')
+  const [linkParticipantId, setLinkParticipantId] = useState('')
+  const [linkMessage, setLinkMessage] = useState('')
+  const [linkError, setLinkError] = useState('')
+  const [workingLink, setWorkingLink] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -893,6 +909,293 @@ function ProtectedTestAccess({
             </article>
           ))}
         </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Vínculos missão–participante</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Associa manualmente participantes do seu tenant a uma missão do seu tenant. Sem
+            prontidão, convite ou composição automática. O participante vinculado verá somente a
+            visão compartilhada desta missão.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              size="small"
+              variant="secondary"
+              disabled={workingLink}
+              onClick={async () => {
+                setWorkingLink(true)
+                setLinkError('')
+                try {
+                  setTenantParticipants(await listTenantParticipants())
+                  setLinks(await listTenantMissionLinks())
+                } catch (requestError) {
+                  const err = requestError as {
+                    response?: { error?: string }
+                    data?: { error?: string }
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
+                  setLinkError(errorBody.error ?? getErrorMessage(requestError))
+                } finally {
+                  setWorkingLink(false)
+                }
+              }}
+            >
+              {workingLink ? 'Carregando…' : 'Listar participantes e vínculos do tenant'}
+            </Button>
+          </div>
+          <form
+            className="mt-4 grid gap-4 sm:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              setLinkError('')
+              setLinkMessage('')
+              setWorkingLink(true)
+              try {
+                const result = await createTestMissionLink(linkMissionId, linkParticipantId)
+                setLinks((prev) => [
+                  {
+                    link_id: result.link_id,
+                    mission_id: result.mission_id,
+                    participant_id: result.participant_id,
+                    status: result.status,
+                    linked_by: result.linked_by,
+                    created_at: result.created_at,
+                    request_id: result.request_id,
+                  },
+                  ...prev.filter((l) => l.link_id !== result.link_id),
+                ])
+                setLinkMessage(
+                  result.already_linked
+                    ? 'Vínculo já existia para este par (idempotente).'
+                    : 'Participante vinculado à missão · evento registrado',
+                )
+              } catch (requestError) {
+                const err = requestError as {
+                  response?: { error?: string }
+                  data?: { error?: string }
+                }
+                const errorBody = err?.response ?? err?.data ?? {}
+                setLinkError(errorBody.error ?? getErrorMessage(requestError))
+              } finally {
+                setWorkingLink(false)
+              }
+            }}
+          >
+            <label className="block text-sm font-medium text-slate-200">
+              Missão do tenant
+              <select
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={linkMissionId}
+                onChange={(event) => setLinkMissionId(event.target.value)}
+                required
+              >
+                <option value="">Selecione…</option>
+                {missions.map((mission) => (
+                  <option key={mission.mission_id} value={mission.mission_id}>
+                    {mission.title} ({mission.status})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-200">
+              Participante do tenant
+              <select
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={linkParticipantId}
+                onChange={(event) => setLinkParticipantId(event.target.value)}
+                required
+              >
+                <option value="">Selecione…</option>
+                {tenantParticipants.map((participant) => (
+                  <option key={participant.participant_id} value={participant.participant_id}>
+                    {participant.display_name} ({participant.contact_key})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={workingLink}>
+                {workingLink ? 'Vinculando…' : 'Vincular participante à missão'}
+              </Button>
+            </div>
+          </form>
+          {linkError && (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {linkError}
+            </p>
+          )}
+          {linkMessage && (
+            <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+              {linkMessage}
+            </p>
+          )}
+          {links.map((link) => (
+            <article
+              key={link.link_id}
+              className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-slate-100">
+                    {missions.find((m) => m.mission_id === link.mission_id)?.title ??
+                      link.mission_id}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    participante{' '}
+                    {tenantParticipants.find((p) => p.participant_id === link.participant_id)
+                      ?.display_name ?? link.participant_id}
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  {link.status}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {link.status === 'active' && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingLink}
+                    onClick={async () => {
+                      setWorkingLink(true)
+                      setLinkError('')
+                      try {
+                        const result = await removeTestMissionLink(link.link_id)
+                        setLinks((prev) =>
+                          prev.map((l) =>
+                            l.link_id === result.link_id ? { ...l, status: result.status } : l,
+                          ),
+                        )
+                        setLinkMessage('Vínculo desfeito · evento registrado')
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setLinkError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingLink(false)
+                      }
+                    }}
+                  >
+                    Desvincular
+                  </Button>
+                )}
+              </div>
+            </article>
+          ))}
+        </section>
+      </div>
+    </main>
+  )
+}
+
+const ParticipantMissionView = ({
+  user,
+  onSignOut,
+}: {
+  user: { name?: string; email?: string; test_role?: string; tenant_id?: string }
+  onSignOut: () => void
+}) => {
+  const [view, setView] = useState<ParticipantMissionView | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    void getParticipantMissionView()
+      .then((result) => {
+        if (active) setView(result)
+      })
+      .catch((requestError) => {
+        if (active) setError(getErrorMessage(requestError))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  return (
+    <main className="min-h-screen bg-slate-950 px-6 py-10 text-slate-100">
+      <div className="mx-auto max-w-3xl">
+        <header className="flex flex-col gap-5 border-b border-slate-800 pb-8 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+              Lunáticos · acesso protegido
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight">Minhas missões</h1>
+            <p className="mt-3 text-sm text-slate-300">
+              Sessão ativa para {user.name || user.email} ·{' '}
+              {roleLabels[user.test_role || ''] || user.test_role}
+            </p>
+          </div>
+          <Button variant="outline" onClick={onSignOut}>
+            Sair
+          </Button>
+        </header>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Visão compartilhada das missões vinculadas</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            O servidor devolve somente as missões com vínculo ativo do seu participante, com campos
+            compartilhados. Sem vínculo, nada é revelado.
+          </p>
+          {loading && <p className="mt-4 text-sm text-slate-300">Carregando visão autorizada…</p>}
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {error}
+            </p>
+          )}
+          {!loading && !error && view && (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-slate-300">
+                Participante: {view.participant.display_name} · tenant {view.participant.tenant_id}
+              </p>
+              {view.missions.length === 0 && (
+                <p className="rounded-lg border border-amber-900 bg-amber-950/40 p-4 text-sm text-amber-100">
+                  Nenhuma missão vinculada a este participante. Sem vínculo, nenhum conteúdo é
+                  revelado.
+                </p>
+              )}
+              {view.missions.map((mission) => (
+                <article
+                  key={mission.mission_id}
+                  className="rounded-2xl border border-slate-800 bg-slate-950 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-100">{mission.title}</h3>
+                      <p className="text-xs text-slate-400">
+                        {mission.modality} · {mission.objective}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                      {mission.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">vínculo desde {mission.linked_at}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-cyan-900/60 bg-cyan-950/20 p-5">
+          <p className="text-sm leading-6 text-cyan-100">
+            Esta visão é calculada server-side pela associação real da sessão. Campos privados de
+            outros participantes e missões de outros tenants nunca são devolvidos.
+          </p>
+        </section>
       </div>
     </main>
   )
@@ -910,6 +1213,10 @@ const Index = () => {
         }}
       />
     )
+  }
+
+  if (user.test_role === 'participant') {
+    return <ParticipantMissionView user={user} onSignOut={signOut} />
   }
 
   return <ProtectedTestAccess user={user} onSignOut={signOut} />
