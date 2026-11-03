@@ -14,6 +14,12 @@ import {
   type TestParticipant,
   type ParticipantEvent,
 } from '@/services/participants'
+import {
+  createTestMission,
+  updateTestMission,
+  listTenantMissions,
+  type TestMission,
+} from '@/services/missions'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -132,6 +138,13 @@ function ProtectedTestAccess({
   const [participantMessage, setParticipantMessage] = useState('')
   const [participantError, setParticipantError] = useState('')
   const [workingParticipant, setWorkingParticipant] = useState(false)
+  const [missionTitle, setMissionTitle] = useState('')
+  const [missionModality, setMissionModality] = useState<'individual' | 'grupo'>('individual')
+  const [missionObjective, setMissionObjective] = useState('')
+  const [missions, setMissions] = useState<TestMission[]>([])
+  const [missionMessage, setMissionMessage] = useState('')
+  const [missionError, setMissionError] = useState('')
+  const [workingMission, setWorkingMission] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -615,6 +628,270 @@ function ProtectedTestAccess({
               ))}
             </div>
           )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Missões de teste</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Cria missão individual ou de grupo no seu tenant, sempre iniciando em rascunho. Sem
+            sessão, prontidão, convite ou composição automática nesta fase.
+          </p>
+          <form
+            className="mt-4 grid gap-4 sm:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              setMissionError('')
+              setMissionMessage('')
+              setWorkingMission(true)
+              try {
+                const result = await createTestMission(
+                  missionTitle.trim(),
+                  missionModality,
+                  missionObjective.trim(),
+                )
+                setMissions((prev) => [result, ...prev])
+                setMissionMessage(`Missão criada em ${result.status} · evento registrado`)
+              } catch (requestError) {
+                const err = requestError as {
+                  response?: { error?: string }
+                  data?: { error?: string }
+                }
+                const errorBody = err?.response ?? err?.data ?? {}
+                setMissionError(errorBody.error ?? getErrorMessage(requestError))
+              } finally {
+                setWorkingMission(false)
+              }
+            }}
+          >
+            <label className="block text-sm font-medium text-slate-200">
+              Título sintético
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={missionTitle}
+                onChange={(event) => setMissionTitle(event.target.value)}
+                placeholder="Missão A Individual"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-200">
+              Modalidade
+              <select
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={missionModality}
+                onChange={(event) =>
+                  setMissionModality(event.target.value as 'individual' | 'grupo')
+                }
+              >
+                <option value="individual">individual</option>
+                <option value="grupo">grupo</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium text-slate-200 sm:col-span-2">
+              Objetivo de teste (não vazio)
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={missionObjective}
+                onChange={(event) => setMissionObjective(event.target.value)}
+                placeholder="Objetivo sintético da missão de teste"
+                required
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={workingMission}>
+                {workingMission ? 'Criando…' : 'Criar missão de teste'}
+              </Button>
+            </div>
+          </form>
+          {missionError && (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {missionError}
+            </p>
+          )}
+          {missionMessage && (
+            <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+              {missionMessage}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              size="small"
+              variant="secondary"
+              disabled={workingMission}
+              onClick={async () => {
+                setWorkingMission(true)
+                setMissionError('')
+                try {
+                  setMissions(await listTenantMissions())
+                } catch (requestError) {
+                  const err = requestError as {
+                    response?: { error?: string }
+                    data?: { error?: string }
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
+                  setMissionError(errorBody.error ?? getErrorMessage(requestError))
+                } finally {
+                  setWorkingMission(false)
+                }
+              }}
+            >
+              {workingMission ? 'Atualizando…' : 'Listar missões do tenant'}
+            </Button>
+          </div>
+          {missions.map((mission) => (
+            <article
+              key={mission.mission_id}
+              className="mt-4 rounded-2xl border border-slate-800 bg-slate-950 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-slate-100">{mission.title}</h3>
+                  <p className="text-xs text-slate-400">
+                    {mission.modality} · {mission.objective}
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                  {mission.status}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {mission.status === 'rascunho' && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingMission}
+                    onClick={async () => {
+                      setWorkingMission(true)
+                      setMissionError('')
+                      try {
+                        const result = await updateTestMission(mission.mission_id, 'activate')
+                        setMissions((prev) =>
+                          prev.map((m) =>
+                            m.mission_id === result.mission_id
+                              ? { ...m, status: result.status }
+                              : m,
+                          ),
+                        )
+                        setMissionMessage(`Missão ${result.status} · evento ${result.event_type}`)
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setMissionError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingMission(false)
+                      }
+                    }}
+                  >
+                    Ativar
+                  </Button>
+                )}
+                {mission.status === 'ativa' && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingMission}
+                    onClick={async () => {
+                      setWorkingMission(true)
+                      setMissionError('')
+                      try {
+                        const result = await updateTestMission(mission.mission_id, 'pause')
+                        setMissions((prev) =>
+                          prev.map((m) =>
+                            m.mission_id === result.mission_id
+                              ? { ...m, status: result.status }
+                              : m,
+                          ),
+                        )
+                        setMissionMessage(`Missão ${result.status} · evento ${result.event_type}`)
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setMissionError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingMission(false)
+                      }
+                    }}
+                  >
+                    Pausar
+                  </Button>
+                )}
+                {(mission.status === 'ativa' || mission.status === 'pausada') && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingMission}
+                    onClick={async () => {
+                      setWorkingMission(true)
+                      setMissionError('')
+                      try {
+                        const result = await updateTestMission(mission.mission_id, 'cancel')
+                        setMissions((prev) =>
+                          prev.map((m) =>
+                            m.mission_id === result.mission_id
+                              ? { ...m, status: result.status }
+                              : m,
+                          ),
+                        )
+                        setMissionMessage(`Missão ${result.status} · evento ${result.event_type}`)
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setMissionError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingMission(false)
+                      }
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+                {mission.status === 'cancelada' && (
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={workingMission}
+                    onClick={async () => {
+                      setWorkingMission(true)
+                      setMissionError('')
+                      try {
+                        const result = await updateTestMission(mission.mission_id, 'reopen')
+                        setMissions((prev) =>
+                          prev.map((m) =>
+                            m.mission_id === result.mission_id
+                              ? { ...m, status: result.status }
+                              : m,
+                          ),
+                        )
+                        setMissionMessage(`Missão ${result.status} · evento ${result.event_type}`)
+                      } catch (requestError) {
+                        const err = requestError as {
+                          response?: { error?: string }
+                          data?: { error?: string }
+                        }
+                        const errorBody = err?.response ?? err?.data ?? {}
+                        setMissionError(errorBody.error ?? getErrorMessage(requestError))
+                      } finally {
+                        setWorkingMission(false)
+                      }
+                    }}
+                  >
+                    Reabrir
+                  </Button>
+                )}
+              </div>
+            </article>
+          ))}
         </section>
       </div>
     </main>
