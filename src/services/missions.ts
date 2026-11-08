@@ -47,11 +47,38 @@ export async function updateTestMission(
 }
 
 export async function listTenantMissions(): Promise<TestMission[]> {
-  const result = await pb.send<{ items: TestMission[] }>('/api/collections/test_missions/records', {
+  // A listagem devolve registros crus do PocketBase (id, created); as ações da
+  // UI esperam o formato das respostas de criação (mission_id, created_at).
+  // A normalização aqui evita mission_id "undefined" nas missões listadas
+  // (AP-2026-11-03-1050 / AP-2026-11-08-0500).
+  const result = await pb.send<{
+    items: Array<{
+      id: string
+      fixture_key: string
+      title: string
+      modality: string
+      objective: string
+      status: string
+      tenant_id: string
+      created: string
+    }>
+  }>('/api/collections/test_missions/records', {
     method: 'GET',
     query: { sort: '-created', perPage: '20' },
   })
-  return result.items
+  return result.items.map((item) => ({
+    mission_id: item.id,
+    fixture_key: item.fixture_key,
+    title: item.title,
+    modality: item.modality,
+    objective: item.objective,
+    status: item.status,
+    tenant_id: item.tenant_id,
+    request_id: '',
+    created_at: item.created,
+    event_id: '',
+    audit_event_id: '',
+  }))
 }
 
 export type MissionEventView = {
