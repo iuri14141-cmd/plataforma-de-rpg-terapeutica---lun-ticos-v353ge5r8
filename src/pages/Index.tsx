@@ -35,6 +35,8 @@ import {
   type MissionLinkEventView,
 } from '@/services/missionLinks'
 
+const APP_VERSION = '0.0.25'
+
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
   participant: 'Participante',
@@ -206,7 +208,7 @@ function ProtectedTestAccess({
             <h1 className="text-3xl font-semibold tracking-tight">Visão autorizada do ambiente</h1>
             <p className="mt-3 text-sm text-slate-300">
               Sessão ativa para {user.name || user.email} ·{' '}
-              {roleLabels[user.test_role || ''] || user.test_role}
+              {roleLabels[user.test_role || ''] || user.test_role} · build {APP_VERSION}
             </p>
           </div>
           <Button variant="outline" onClick={onSignOut}>
@@ -1300,7 +1302,7 @@ const ParticipantMissionView = ({
             <h1 className="text-3xl font-semibold tracking-tight">Minhas missões</h1>
             <p className="mt-3 text-sm text-slate-300">
               Sessão ativa para {user.name || user.email} ·{' '}
-              {roleLabels[user.test_role || ''] || user.test_role}
+              {roleLabels[user.test_role || ''] || user.test_role} · build {APP_VERSION}
             </p>
           </div>
           <Button variant="outline" onClick={onSignOut}>
