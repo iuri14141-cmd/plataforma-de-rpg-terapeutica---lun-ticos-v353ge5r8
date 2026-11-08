@@ -18,6 +18,8 @@ import {
   createTestMission,
   updateTestMission,
   listTenantMissions,
+  getMissionTimeline,
+  type MissionEventView,
   type TestMission,
 } from '@/services/missions'
 import {
@@ -26,8 +28,11 @@ import {
   listTenantMissionLinks,
   listTenantParticipants,
   getParticipantMissionView,
+  probeCrossTenantLink,
+  getLinkTimeline,
   type MissionLink,
   type TenantParticipant,
+  type MissionLinkEventView,
 } from '@/services/missionLinks'
 
 const roleLabels: Record<string, string> = {
@@ -161,6 +166,17 @@ function ProtectedTestAccess({
   const [linkMessage, setLinkMessage] = useState('')
   const [linkError, setLinkError] = useState('')
   const [workingLink, setWorkingLink] = useState(false)
+  const [missionTimeline, setMissionTimeline] = useState<MissionEventView[]>([])
+  const [missionTimelineFor, setMissionTimelineFor] = useState<string | null>(null)
+  const [linkTimeline, setLinkTimeline] = useState<MissionLinkEventView[]>([])
+  const [linkTimelineFor, setLinkTimelineFor] = useState<string | null>(null)
+  const [probeResult, setProbeResult] = useState<{
+    outcome: string
+    rule_id?: string
+    audit_event_id?: string
+    error?: string
+  } | null>(null)
+  const [probingLink, setProbingLink] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -905,7 +921,45 @@ function ProtectedTestAccess({
                     Reabrir
                   </Button>
                 )}
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={workingMission}
+                  onClick={async () => {
+                    setWorkingMission(true)
+                    setMissionError('')
+                    try {
+                      setMissionTimeline(await getMissionTimeline(mission.mission_id))
+                      setMissionTimelineFor(mission.mission_id)
+                    } catch (requestError) {
+                      const err = requestError as {
+                        response?: { error?: string }
+                        data?: { error?: string }
+                      }
+                      const errorBody = err?.response ?? err?.data ?? {}
+                      setMissionError(errorBody.error ?? getErrorMessage(requestError))
+                    } finally {
+                      setWorkingMission(false)
+                    }
+                  }}
+                >
+                  Ver linha do tempo
+                </Button>
               </div>
+              {missionTimelineFor === mission.mission_id && (
+                <ol className="mt-4 space-y-2 border-l border-slate-700 pl-4 text-sm text-slate-300">
+                  {missionTimeline.map((item) => (
+                    <li key={item.id}>
+                      <span className="font-medium text-cyan-300">{item.event_type}</span>
+                      {' · '}
+                      <span className="text-slate-400">
+                        {item.before_status} → {item.after_status} · {item.created} · ator{' '}
+                        {item.actor_id} · request {item.request_id}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </article>
           ))}
         </section>
@@ -1085,9 +1139,122 @@ function ProtectedTestAccess({
                     Desvincular
                   </Button>
                 )}
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={workingLink}
+                  onClick={async () => {
+                    setWorkingLink(true)
+                    setLinkError('')
+                    try {
+                      setLinkTimeline(await getLinkTimeline(link.link_id))
+                      setLinkTimelineFor(link.link_id)
+                    } catch (requestError) {
+                      const err = requestError as {
+                        response?: { error?: string }
+                        data?: { error?: string }
+                      }
+                      const errorBody = err?.response ?? err?.data ?? {}
+                      setLinkError(errorBody.error ?? getErrorMessage(requestError))
+                    } finally {
+                      setWorkingLink(false)
+                    }
+                  }}
+                >
+                  Ver linha do tempo
+                </Button>
               </div>
+              {linkTimelineFor === link.link_id && (
+                <ol className="mt-4 space-y-2 border-l border-slate-700 pl-4 text-sm text-slate-300">
+                  {linkTimeline.map((item) => (
+                    <li key={item.id}>
+                      <span className="font-medium text-cyan-300">{item.event_type}</span>
+                      {' · '}
+                      <span className="text-slate-400">
+                        {item.created} · ator {item.actor_id} · request {item.request_id}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </article>
           ))}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-cyan-900/60 bg-cyan-950/20 p-5">
+          <h2 className="text-lg font-semibold">Demonstração de acesso isolado (F1-T09)</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            A sonda tenta vincular um participante de outro tenant à missão selecionada. O servidor
+            nega, registra auditoria e não revela o alvo. Nenhum vínculo é criado.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <select
+              className="w-full max-w-xs rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              value={linkMissionId}
+              onChange={(event) => setLinkMissionId(event.target.value)}
+            >
+              <option value="">Selecione a missão da sonda…</option>
+              {missions.map((mission) => (
+                <option key={mission.mission_id} value={mission.mission_id}>
+                  {mission.title} ({mission.status})
+                </option>
+              ))}
+            </select>
+            <Button
+              disabled={probingLink || !linkMissionId}
+              onClick={async () => {
+                setProbingLink(true)
+                setProbeResult(null)
+                try {
+                  const result = await probeCrossTenantLink(linkMissionId)
+                  setProbeResult({
+                    outcome: result.outcome ?? 'allowed',
+                    rule_id: result.rule_id,
+                    audit_event_id: result.audit_event_id,
+                  })
+                } catch (requestError) {
+                  const err = requestError as {
+                    response?: { rule_id?: string; audit_event_id?: string; error?: string }
+                    data?: { rule_id?: string; audit_event_id?: string; error?: string }
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
+                  setProbeResult({
+                    outcome: 'denied',
+                    rule_id: errorBody.rule_id,
+                    audit_event_id: errorBody.audit_event_id,
+                    error: errorBody.error ?? getErrorMessage(requestError),
+                  })
+                } finally {
+                  setProbingLink(false)
+                }
+              }}
+            >
+              {probingLink ? 'Consultando…' : 'Tentar vínculo cross-tenant'}
+            </Button>
+            {probeResult && (
+              <span
+                className={
+                  probeResult.outcome === 'allowed'
+                    ? 'rounded-full bg-emerald-950 px-3 py-1 text-xs text-emerald-200'
+                    : 'rounded-full bg-red-950 px-3 py-1 text-xs text-red-200'
+                }
+              >
+                {probeResult.outcome === 'allowed'
+                  ? 'permitido'
+                  : `negado · ${probeResult.rule_id || 'sem regra'}`}
+              </span>
+            )}
+          </div>
+          {probeResult?.audit_event_id && (
+            <p className="mt-3 text-xs text-slate-400">
+              Auditoria registrada: {probeResult.audit_event_id}
+            </p>
+          )}
+          {probeResult?.error && (
+            <p role="alert" className="mt-3 text-sm text-red-300">
+              {probeResult.error}
+            </p>
+          )}
         </section>
       </div>
     </main>

@@ -98,3 +98,40 @@ export async function getParticipantMissionView(): Promise<ParticipantMissionVie
     method: 'GET',
   })
 }
+
+export type LinkProbeResult = {
+  outcome?: string
+  rule_id?: string
+  audit_event_id?: string
+  request_id?: string
+  error?: string
+}
+
+export async function probeCrossTenantLink(missionId: string): Promise<LinkProbeResult> {
+  return pb.send<LinkProbeResult>('/backend/v1/test-mission-link-probe', {
+    method: 'POST',
+    body: { mission_id: missionId },
+  })
+}
+
+export type MissionLinkEventView = {
+  id: string
+  event_type: string
+  actor_id: string
+  request_id: string
+  created: string
+}
+
+export async function getLinkTimeline(linkId: string): Promise<MissionLinkEventView[]> {
+  const result = await pb.send<{
+    items: MissionLinkEventView[]
+  }>('/api/collections/test_mission_link_events/records', {
+    method: 'GET',
+    query: {
+      filter: `link_id="${linkId}"`,
+      sort: 'created',
+      perPage: '50',
+    },
+  })
+  return result.items
+}

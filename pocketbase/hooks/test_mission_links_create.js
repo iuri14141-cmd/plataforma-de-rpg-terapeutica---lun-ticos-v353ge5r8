@@ -41,9 +41,24 @@ routerAdd(
     }
 
     if (mission.getString('tenant_id') !== authTenant) {
+      // CA-1-13: negação cross-tenant gera auditoria sem revelar o alvo.
+      const requestId = e.request.id || $security.randomString(16)
+      const audit = new Record($app.findCollectionByNameOrId('audit_events'))
+      audit.set('event_id', 'deny-' + $security.randomString(12))
+      audit.set('request_id', requestId)
+      audit.set('action', 'probe')
+      audit.set('target_type', 'test_mission_links')
+      audit.set('target_id', mission.id)
+      audit.set('outcome', 'denied')
+      audit.set('rule_id', 'RN-1.02')
+      audit.set('actor_id', auth.id)
+      audit.set('tenant_id', authTenant)
+      $app.save(audit)
+
       return e.json(403, {
         error: 'recurso fora do contexto autorizado',
         rule_id: 'RN-1.02',
+        audit_event_id: audit.id,
       })
     }
 
@@ -55,9 +70,24 @@ routerAdd(
     }
 
     if (participant.getString('tenant_id') !== authTenant) {
+      // CA-1-13: negação cross-tenant gera auditoria sem revelar o alvo.
+      const requestId = e.request.id || $security.randomString(16)
+      const audit = new Record($app.findCollectionByNameOrId('audit_events'))
+      audit.set('event_id', 'deny-' + $security.randomString(12))
+      audit.set('request_id', requestId)
+      audit.set('action', 'probe')
+      audit.set('target_type', 'test_mission_links')
+      audit.set('target_id', participant.id)
+      audit.set('outcome', 'denied')
+      audit.set('rule_id', 'RN-1.02')
+      audit.set('actor_id', auth.id)
+      audit.set('tenant_id', authTenant)
+      $app.save(audit)
+
       return e.json(403, {
         error: 'recurso fora do contexto autorizado',
         rule_id: 'RN-1.02',
+        audit_event_id: audit.id,
       })
     }
 

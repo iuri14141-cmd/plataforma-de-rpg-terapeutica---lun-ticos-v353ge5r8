@@ -53,3 +53,27 @@ export async function listTenantMissions(): Promise<TestMission[]> {
   })
   return result.items
 }
+
+export type MissionEventView = {
+  id: string
+  event_type: string
+  before_status: string
+  after_status: string
+  actor_id: string
+  request_id: string
+  created: string
+}
+
+export async function getMissionTimeline(missionId: string): Promise<MissionEventView[]> {
+  const result = await pb.send<{
+    items: MissionEventView[]
+  }>('/api/collections/test_mission_events/records', {
+    method: 'GET',
+    query: {
+      filter: `mission_id="${missionId}"`,
+      sort: 'created',
+      perPage: '50',
+    },
+  })
+  return result.items
+}
