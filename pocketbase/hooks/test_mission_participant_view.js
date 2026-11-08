@@ -40,8 +40,47 @@ routerAdd(
       return e.json(403, { error: 'identidade de teste não encontrada', rule_id: 'RN-1.01' })
     }
 
-    // Participantes do tenant cujo contact_key corresponde ao e-mail da identidade.
-    const contactKey = identity.getString('email').toLowerCase()
+    // Participante da sessão: vínculo determinístico identity_id (F1-T08).
+    // Fallback legado: contact_key = e-mail da identidade (participantes antigos).
+    let participant = null
+    try {
+      participant = $app.findFirstRecordByFilter(
+        'test_participants',
+        "tenant_id = '" +
+          authTenant.replace(/'/g, "''") +
+          "' && identity_id = '" +
+          identity.id.replace(/'/g, "''") +
+          "'",
+      )
+    } catch (_) {
+      participant = null
+    }
+
+    if (!participant) {
+      const contactKey = identity.getString('email').toLowerCase()
+      try {
+        participant = $app.findFirstRecordByFilter(
+          'test_participants',
+          "tenant_id = '" +
+            authTenant.replace(/'/g, "''") +
+            "' && contact_key = '" +
+            contactKey.replace(/'/g, "''") +
+            "'",
+        )
+      } catch (_) {
+        participant = null
+      }
+    }
+
+    if (!participant) {
+      return e.json(200, {
+        participant: {
+          display_name: identity.getString('display_name'),
+          tenant_id: authTenant,
+        },
+        missions: [],
+      })
+    }
 
     let links = []
     try {
@@ -58,14 +97,7 @@ routerAdd(
 
     const missions = []
     for (const link of links) {
-      let participant = null
-      try {
-        participant = $app.findRecordById('test_participants', link.getString('participant_id'))
-      } catch (_) {
-        continue
-      }
-
-      if (participant.getString('contact_key').toLowerCase() !== contactKey) {
+      if (link.getString('participant_id') !== participant.id) {
         continue
       }
 
@@ -92,7 +124,7 @@ routerAdd(
 
     return e.json(200, {
       participant: {
-        display_name: identity.getString('display_name'),
+        display_name: participant.getString('display_name'),
         tenant_id: authTenant,
       },
       missions: missions,

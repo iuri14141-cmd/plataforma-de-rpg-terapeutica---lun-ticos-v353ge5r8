@@ -67,6 +67,24 @@ routerAdd(
       })
     }
 
+    // Vínculo determinístico com a identidade sintética (F1-T08): quando o
+    // contact_key do interesse é o e-mail de uma identidade participante ativa
+    // do mesmo tenant, o participante nasce vinculado a essa identidade.
+    let identityId = ''
+    try {
+      const identity = $app.findFirstRecordByFilter(
+        'test_identities',
+        "tenant_id = '" +
+          authTenant.replace(/'/g, "''") +
+          "' && email = '" +
+          interest.getString('contact_key').replace(/'/g, "''").toLowerCase() +
+          "'",
+      )
+      identityId = identity.id
+    } catch (_) {
+      identityId = ''
+    }
+
     const record = new Record($app.findCollectionByNameOrId('test_participants'))
     record.set('fixture_key', 'participant-' + $security.randomString(10))
     record.set('tenant_id', authTenant)
@@ -74,6 +92,7 @@ routerAdd(
     record.set('display_name', interest.getString('display_name'))
     record.set('contact_key', interest.getString('contact_key'))
     record.set('lifecycle_status', 'participant_registered')
+    record.set('identity_id', identityId)
     $app.save(record)
 
     const event = new Record($app.findCollectionByNameOrId('test_participant_events'))
