@@ -52,6 +52,8 @@ export type InterestListItem = {
 }
 
 export async function listTenantInterests(): Promise<InterestListItem[]> {
+  // Sem filtro: o RLS da coleção já restringe a listagem ao tenant da sessão.
+  // (Filtro anterior contact_key="" era inválido e escondia as fichas.)
   const result = await pb.send<{
     items: Array<{
       id: string
@@ -62,7 +64,7 @@ export async function listTenantInterests(): Promise<InterestListItem[]> {
     }>
   }>('/api/collections/test_interests/records', {
     method: 'GET',
-    query: { filter: `contact_key="${''}"`, sort: '-created', perPage: '50' },
+    query: { sort: '-created', perPage: '50' },
   })
   return result.items.map((item) => ({
     interest_id: item.id,

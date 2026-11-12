@@ -41,7 +41,7 @@ import {
   type MissionLinkEventView,
 } from '@/services/missionLinks'
 
-const APP_VERSION = '0.0.26'
+const APP_VERSION = '0.0.29'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
