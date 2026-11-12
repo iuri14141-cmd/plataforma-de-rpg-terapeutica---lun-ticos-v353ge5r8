@@ -22,3 +22,53 @@ export async function createTestInterest(
     body: { display_name: displayName, contact_key: contactKey },
   })
 }
+
+export type FailureProbeResult = {
+  duplicate?: boolean
+  interest_id?: string
+  display_name?: string
+  contact_key?: string
+  status?: string
+  request_id?: string
+  created_at?: string
+}
+
+export async function createTestInterestWithFailureMode(
+  displayName: string,
+  contactKey: string,
+): Promise<FailureProbeResult> {
+  return pb.send<FailureProbeResult>('/backend/v1/test-interests-failure-probe', {
+    method: 'POST',
+    body: { display_name: displayName, contact_key: contactKey },
+  })
+}
+
+export type InterestListItem = {
+  interest_id: string
+  display_name: string
+  contact_key: string
+  status: string
+  created_at: string
+}
+
+export async function listTenantInterests(): Promise<InterestListItem[]> {
+  const result = await pb.send<{
+    items: Array<{
+      id: string
+      display_name: string
+      contact_key: string
+      status: string
+      created: string
+    }>
+  }>('/api/collections/test_interests/records', {
+    method: 'GET',
+    query: { filter: `contact_key="${''}"`, sort: '-created', perPage: '50' },
+  })
+  return result.items.map((item) => ({
+    interest_id: item.id,
+    display_name: item.display_name,
+    contact_key: item.contact_key,
+    status: item.status,
+    created_at: item.created,
+  }))
+}

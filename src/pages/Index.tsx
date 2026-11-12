@@ -5,7 +5,13 @@ import { getErrorMessage } from '@/lib/pocketbase/errors'
 import { useAuth } from '@/hooks/use-auth'
 import { getAccessibleTestIdentities, type TestIdentity } from '@/services/testAccess'
 import { probeTestAccess, type ProbeResult } from '@/services/probe'
-import { createTestInterest, type TestInterest } from '@/services/interests'
+import {
+  createTestInterest,
+  createTestInterestWithFailureMode,
+  listTenantInterests,
+  type InterestListItem,
+  type TestInterest,
+} from '@/services/interests'
 import { getLatestTenantInterest } from '@/services/interestQuery'
 import {
   promoteTestParticipant,
@@ -148,6 +154,12 @@ function ProtectedTestAccess({
   const [interest, setInterest] = useState<TestInterest | null>(null)
   const [interestError, setInterestError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [demoName, setDemoName] = useState('')
+  const [demoContact, setDemoContact] = useState('')
+  const [demoMessage, setDemoMessage] = useState('')
+  const [demoError, setDemoError] = useState('')
+  const [demoWorking, setDemoWorking] = useState(false)
+  const [demoList, setDemoList] = useState<InterestListItem[]>([])
   const [participants, setParticipants] = useState<TestParticipant[]>([])
   const [timelineFor, setTimelineFor] = useState<string | null>(null)
   const [timeline, setTimeline] = useState<ParticipantEvent[]>([])
@@ -269,6 +281,124 @@ function ProtectedTestAccess({
             <p role="alert" className="mt-3 text-sm text-red-300">
               {probe.error}
             </p>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-cyan-900/60 bg-cyan-950/20 p-5">
+          <h2 className="text-lg font-semibold">Demonstração de falha de gravação (F2-T01)</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Registra um interesse de teste pelo modo controlado da demonstração. Com a falha ligada,
+            o servidor responde com erro e nenhum registro é criado; com a falha desligada, o
+            cadastro grava normalmente e o reenvio não cria segunda ficha.
+          </p>
+          <form
+            className="mt-4 grid gap-4 sm:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              setDemoError('')
+              setDemoMessage('')
+              setDemoWorking(true)
+              try {
+                const result = await createTestInterestWithFailureMode(
+                  demoName.trim(),
+                  demoContact.trim(),
+                )
+                setDemoMessage(
+                  result.duplicate
+                    ? 'Cadastro já existia (idempotente) — apenas uma ficha.'
+                    : 'Cadastro gravado com sucesso.',
+                )
+              } catch (requestError) {
+                const err = requestError as {
+                  response?: { error?: string }
+                  data?: { error?: string }
+                }
+                const errorBody = err?.response ?? err?.data ?? {}
+                setDemoError(
+                  errorBody.error ??
+                    'Não foi possível salvar o cadastro. Verifique os dados e tente novamente.',
+                )
+              } finally {
+                setDemoWorking(false)
+              }
+            }}
+          >
+            <label className="block text-sm font-medium text-slate-200">
+              Nome fictício da demonstração
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={demoName}
+                onChange={(event) => setDemoName(event.target.value)}
+                placeholder="Bento Teste F2"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-200">
+              E-mail fictício da demonstração
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={demoContact}
+                onChange={(event) => setDemoContact(event.target.value)}
+                placeholder="bento.f2@tests.invalid"
+                type="email"
+                required
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={demoWorking}>
+                {demoWorking ? 'Enviando…' : 'Enviar cadastro da demonstração'}
+              </Button>
+            </div>
+          </form>
+          {demoError && (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {demoError}
+            </p>
+          )}
+          {demoMessage && (
+            <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+              {demoMessage}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              size="small"
+              variant="secondary"
+              disabled={demoWorking}
+              onClick={async () => {
+                setDemoWorking(true)
+                setDemoError('')
+                try {
+                  setDemoList(await listTenantInterests())
+                } catch (requestError) {
+                  const err = requestError as {
+                    response?: { error?: string }
+                    data?: { error?: string }
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
+                  setDemoError(errorBody.error ?? getErrorMessage(requestError))
+                } finally {
+                  setDemoWorking(false)
+                }
+              }}
+            >
+              {demoWorking ? 'Carregando…' : 'Listar fichas da demonstração'}
+            </Button>
+          </div>
+          {demoList.length > 0 && (
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              {demoList.map((item) => (
+                <li
+                  key={item.interest_id}
+                  className="rounded-lg border border-slate-800 bg-slate-950 p-3"
+                >
+                  {item.display_name} · {item.contact_key} · {item.status} · {item.created_at}
+                </li>
+              ))}
+            </ul>
           )}
         </section>
 
