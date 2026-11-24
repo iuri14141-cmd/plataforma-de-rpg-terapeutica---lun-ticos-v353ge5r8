@@ -22,15 +22,8 @@ export function extractFieldErrors(error: unknown): FieldErrors {
 
 export function getErrorMessage(error: unknown): string {
   if (!(error instanceof ClientResponseError)) {
-    return error instanceof Error ? error.message : 'Ocorreu um erro inesperado. Tente novamente.'
+    return error instanceof Error ? error.message : 'An unexpected error occurred.'
   }
-  const body = error.response as Record<string, unknown> | undefined
-  const bodyMessage = body && typeof body.error === 'string' ? body.error.trim() : ''
   const msgs = Object.values(extractFieldErrors(error))
-  if (msgs.length > 0) return msgs.join(' ')
-  if (bodyMessage) return bodyMessage
-  if (error.status === 0) {
-    return 'Não foi possível falar com o servidor. Verifique sua conexão e tente novamente.'
-  }
-  return error.message || 'Ocorreu um erro inesperado. Tente novamente.'
+  return msgs.length > 0 ? msgs.join(' ') : error.message || 'An unexpected error occurred.'
 }

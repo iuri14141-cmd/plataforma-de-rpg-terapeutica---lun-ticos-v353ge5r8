@@ -33,14 +33,17 @@ export default function Clientes() {
   const [total, setTotal] = useState(0)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
     setState('loading')
     setError('')
+    setNotice('')
     try {
       const result = await listCrmClients()
       setClients(result.clients)
       setTotal(result.total)
+      setNotice(result.stale && result.error ? result.error : '')
       setState('ready')
     } catch (requestError) {
       setError(getErrorMessage(requestError))
@@ -79,6 +82,15 @@ export default function Clientes() {
             {state === 'loading' ? 'Atualizando…' : 'Atualizar'}
           </Button>
         </header>
+
+        {notice && (
+          <div
+            role="status"
+            className="mt-6 rounded-lg border border-amber-900 bg-amber-950/40 p-4 text-sm text-amber-100"
+          >
+            {notice}
+          </div>
+        )}
 
         <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

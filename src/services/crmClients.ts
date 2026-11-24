@@ -11,6 +11,12 @@ export type CrmClient = {
 export type CrmClientsResult = {
   clients: CrmClient[]
   total: number
+  /** Verdadeiro quando a resposta veio da cópia local (CRM indisponível). */
+  stale?: boolean
+  /** Aviso amigável em pt-BR quando a resposta é uma cópia local. */
+  error?: string
+  /** Data (ISO) da última sincronização bem-sucedida com o CRM. */
+  synced_at?: string
 }
 
 export async function listCrmClients(): Promise<CrmClientsResult> {
