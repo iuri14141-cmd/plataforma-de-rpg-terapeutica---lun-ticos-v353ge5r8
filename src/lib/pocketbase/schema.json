@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-24T14:14:23.926Z",
+  "generatedAt": "2026-11-24T14:50:06.510Z",
   "collections": [
     {
       "name": "users",
@@ -672,6 +672,35 @@
             "onCreate",
             "onUpdate"
           ]
+        },
+        {
+          "name": "group_min",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "group_max",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sessions_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "frequency",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "semanal",
+            "quinzenal",
+            "mensal"
+          ]
         }
       ],
       "indexes": [
@@ -1146,6 +1175,91 @@
         "CREATE UNIQUE INDEX idx_test_screening_decisions_decision_id ON test_screening_decisions (decision_id)",
         "CREATE INDEX idx_test_screening_decisions_submission ON test_screening_decisions (submission_id, created)",
         "CREATE INDEX idx_test_screening_decisions_tenant ON test_screening_decisions (tenant_id, created)"
+      ]
+    },
+    {
+      "name": "test_referrals",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.access_status = 'active' && @request.auth.test_role = 'champion' && tenant_id = @request.auth.tenant_id",
+        "view": "@request.auth.id != '' && @request.auth.access_status = 'active' && @request.auth.test_role = 'champion' && tenant_id = @request.auth.tenant_id",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "referral_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "submission_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "test_screening_submissions"
+        },
+        {
+          "name": "tenant_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "test_tenants"
+        },
+        {
+          "name": "destination",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "individual",
+            "grupo"
+          ]
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "referred_by",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "request_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_test_referrals_referral_id ON test_referrals (referral_id)",
+        "CREATE INDEX idx_test_referrals_submission ON test_referrals (submission_id, created)",
+        "CREATE INDEX idx_test_referrals_tenant ON test_referrals (tenant_id, created)"
       ]
     }
   ]

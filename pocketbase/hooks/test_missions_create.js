@@ -1,6 +1,9 @@
-// Criação de missão de teste (F1-T07, CA-1-11).
+// Criação de missão de teste (F1-T07, CA-1-11) + campanha de grupo (F2-T05).
 // O champion autenticado cria uma missão no tenant da sessão com modalidade
 // individual/grupo e objetivo não vazio; a missão inicia SEMPRE em rascunho.
+// Campanha de grupo (F2-T05): modalidade grupo exige os parâmetros de negócio
+// definidos pelo Champion — group_min 3, group_max 6, sessions_total 12 e
+// frequency semanal (gravados server-side; o cliente não define os valores).
 // Sem sessão, prontidão, convite ou composição automática (CA-1-15).
 // A confirmação só é enviada após a persistência do registro e do evento.
 routerAdd(
@@ -39,6 +42,20 @@ routerAdd(
 
     const requestId = e.request.id || $security.randomString(16)
 
+    // Parâmetros de campanha de grupo (F2-T05): definidos pelo Champion
+    // (3 a 6 pessoas, 12 encontros, semanal) e gravados server-side. O
+    // cliente não envia os valores; a missão individual não os recebe.
+    let groupMin = 0
+    let groupMax = 0
+    let sessionsTotal = 0
+    let frequency = ''
+    if (modality === 'grupo') {
+      groupMin = 3
+      groupMax = 6
+      sessionsTotal = 12
+      frequency = 'semanal'
+    }
+
     const record = new Record($app.findCollectionByNameOrId('test_missions'))
     record.set('fixture_key', 'mission-' + $security.randomString(10))
     record.set('tenant_id', authTenant)
@@ -47,6 +64,12 @@ routerAdd(
     record.set('objective', objective)
     record.set('status', 'rascunho')
     record.set('created_by', auth.id)
+    if (modality === 'grupo') {
+      record.set('group_min', groupMin)
+      record.set('group_max', groupMax)
+      record.set('sessions_total', sessionsTotal)
+      record.set('frequency', frequency)
+    }
     $app.save(record)
 
     const event = new Record($app.findCollectionByNameOrId('test_mission_events'))
@@ -79,6 +102,10 @@ routerAdd(
       objective: record.getString('objective'),
       status: record.getString('status'),
       tenant_id: authTenant,
+      group_min: groupMin,
+      group_max: groupMax,
+      sessions_total: sessionsTotal,
+      frequency: frequency,
       request_id: requestId,
       created_at: record.getString('created'),
       event_id: event.id,

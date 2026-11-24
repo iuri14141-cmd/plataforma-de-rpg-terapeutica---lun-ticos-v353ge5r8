@@ -26,6 +26,11 @@ import {
   type ScreeningDecisionTimeline,
 } from '@/services/decisions'
 import {
+  createTestReferral,
+  getReferralTimeline,
+  type ReferralTimeline,
+} from '@/services/referrals'
+import {
   promoteTestParticipant,
   updateTestParticipant,
   getParticipantEvents,
@@ -53,7 +58,7 @@ import {
   type MissionLinkEventView,
 } from '@/services/missionLinks'
 
-const APP_VERSION = '0.0.31'
+const APP_VERSION = '0.0.32'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -226,6 +231,16 @@ function ProtectedTestAccess({
   const [workingDecision, setWorkingDecision] = useState(false)
   const [decisionTimeline, setDecisionTimeline] = useState<ScreeningDecisionTimeline | null>(null)
   const [decisionTimelineFor, setDecisionTimelineFor] = useState<string | null>(null)
+  const [referralFor, setReferralFor] = useState<string | null>(null)
+  const [referralDestination, setReferralDestination] = useState<'individual' | 'grupo'>(
+    'individual',
+  )
+  const [referralReason, setReferralReason] = useState('')
+  const [referralMessage, setReferralMessage] = useState('')
+  const [referralError, setReferralError] = useState('')
+  const [workingReferral, setWorkingReferral] = useState(false)
+  const [referralTimeline, setReferralTimeline] = useState<ReferralTimeline | null>(null)
+  const [referralTimelineFor, setReferralTimelineFor] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -904,6 +919,152 @@ function ProtectedTestAccess({
                       ))}
                     </ol>
                   )}
+                  {item.status === 'screened' && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        disabled={workingReferral}
+                        onClick={() => {
+                          setReferralFor(item.submission_id)
+                          setReferralDestination('individual')
+                          setReferralReason('')
+                          setReferralError('')
+                          setReferralMessage('')
+                        }}
+                      >
+                        Encaminhar
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="secondary"
+                        disabled={workingReferral}
+                        onClick={async () => {
+                          setWorkingReferral(true)
+                          setReferralError('')
+                          try {
+                            const timeline = await getReferralTimeline(item.submission_id)
+                            setReferralTimeline(timeline)
+                            setReferralTimelineFor(item.submission_id)
+                          } catch (requestError) {
+                            const err = requestError as {
+                              response?: { error?: string }
+                              data?: { error?: string }
+                            }
+                            const errorBody = err?.response ?? err?.data ?? {}
+                            setReferralError(errorBody.error ?? getErrorMessage(requestError))
+                          } finally {
+                            setWorkingReferral(false)
+                          }
+                        }}
+                      >
+                        Ver encaminhamentos
+                      </Button>
+                    </div>
+                  )}
+                  {referralFor === item.submission_id && (
+                    <form
+                      className="mt-3 space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-3"
+                      onSubmit={async (event) => {
+                        event.preventDefault()
+                        setReferralError('')
+                        setReferralMessage('')
+                        setWorkingReferral(true)
+                        try {
+                          const result = await createTestReferral(
+                            item.submission_id,
+                            referralDestination,
+                            referralReason.trim(),
+                          )
+                          setReferralMessage(
+                            `Encaminhamento registrado: ${result.destination} · por ${result.referred_by} · ${result.created_at}`,
+                          )
+                          setReferralFor(null)
+                          setReferralReason('')
+                          const queue = await getScreeningQueue()
+                          setScreeningQueue(queue)
+                        } catch (requestError) {
+                          const err = requestError as {
+                            response?: { error?: string }
+                            data?: { error?: string }
+                          }
+                          const errorBody = err?.response ?? err?.data ?? {}
+                          setReferralError(errorBody.error ?? getErrorMessage(requestError))
+                        } finally {
+                          setWorkingReferral(false)
+                        }
+                      }}
+                    >
+                      <p className="text-xs font-medium text-slate-200">
+                        Encaminhamento da ficha elegível — a justificativa é obrigatória (quem,
+                        quando e por quê ficam registrados; o encaminhamento anterior nunca é
+                        apagado).
+                      </p>
+                      <label className="block text-sm font-medium text-slate-200">
+                        Destino
+                        <select
+                          className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                          value={referralDestination}
+                          onChange={(event) =>
+                            setReferralDestination(event.target.value as 'individual' | 'grupo')
+                          }
+                        >
+                          <option value="individual">individual</option>
+                          <option value="grupo">grupo</option>
+                        </select>
+                      </label>
+                      <textarea
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                        value={referralReason}
+                        onChange={(event) => setReferralReason(event.target.value)}
+                        placeholder="Justificativa do encaminhamento (texto livre)"
+                        required
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={workingReferral}>
+                          {workingReferral ? 'Registrando…' : 'Registrar encaminhamento'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={workingReferral}
+                          onClick={() => setReferralFor(null)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                  {referralError && (
+                    <p
+                      role="alert"
+                      className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+                    >
+                      {referralError}
+                    </p>
+                  )}
+                  {referralMessage && (
+                    <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+                      {referralMessage}
+                    </p>
+                  )}
+                  {referralTimelineFor === item.submission_id && referralTimeline && (
+                    <ol className="mt-3 space-y-2 border-l border-slate-700 pl-4 text-sm text-slate-300">
+                      {referralTimeline.items.length === 0 && (
+                        <li className="text-slate-500">Nenhum encaminhamento registrado ainda.</li>
+                      )}
+                      {referralTimeline.items.map((entry) => (
+                        <li key={entry.referral_id}>
+                          <span className="font-medium text-cyan-300">{entry.destination}</span>
+                          {' · '}
+                          <span className="text-slate-400">
+                            {entry.created_at} · encaminhado por {entry.referred_by}
+                          </span>
+                          <p className="text-xs text-slate-500">Justificativa: {entry.reason}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1210,7 +1371,9 @@ function ProtectedTestAccess({
           <h2 className="text-lg font-semibold">Missões de teste</h2>
           <p className="mt-1 text-sm text-slate-400">
             Cria missão individual ou de grupo no seu tenant, sempre iniciando em rascunho. Sem
-            sessão, prontidão, convite ou composição automática nesta fase.
+            sessão, prontidão, convite ou composição automática nesta fase. Campanha de grupo
+            (F2-T05): 3 a 6 pessoas, 12 encontros, frequência semanal — parâmetros definidos pelo
+            Champion e gravados server-side.
           </p>
           <form
             className="mt-4 grid gap-4 sm:grid-cols-2"
@@ -1326,6 +1489,9 @@ function ProtectedTestAccess({
                   <h3 className="font-semibold text-slate-100">{mission.title}</h3>
                   <p className="text-xs text-slate-400">
                     {mission.modality} · {mission.objective}
+                    {mission.modality === 'grupo' && mission.group_min
+                      ? ` · grupo ${mission.group_min}–${mission.group_max} pessoas · ${mission.sessions_total} encontros · ${mission.frequency}`
+                      : ''}
                   </p>
                 </div>
                 <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
@@ -1513,7 +1679,8 @@ function ProtectedTestAccess({
           <p className="mt-1 text-sm text-slate-400">
             Associa manualmente participantes do seu tenant a uma missão do seu tenant. Sem
             prontidão, convite ou composição automática. O participante vinculado verá somente a
-            visão compartilhada desta missão.
+            visão compartilhada desta missão. Campanha de grupo (F2-T05): a missão de grupo aceita
+            vínculos até 6 participantes ativos; abaixo de 3 o grupo aparece como incompleto.
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
@@ -1541,6 +1708,21 @@ function ProtectedTestAccess({
               {workingLink ? 'Carregando…' : 'Listar participantes e vínculos do tenant'}
             </Button>
           </div>
+          {missions
+            .filter((m) => m.modality === 'grupo')
+            .map((mission) => {
+              const activeCount = links.filter(
+                (l) => l.mission_id === mission.mission_id && l.status === 'active',
+              ).length
+              const incomplete = mission.group_min ? activeCount < mission.group_min : false
+              return (
+                <p key={mission.mission_id} className="mt-2 text-xs text-slate-400">
+                  {mission.title}: {activeCount}/{mission.group_max ?? 6} participantes ativos
+                  {incomplete ? ` · grupo incompleto (mínimo ${mission.group_min})` : ''}
+                  {activeCount >= (mission.group_max ?? 6) ? ' · campanha cheia' : ''}
+                </p>
+              )
+            })}
           <form
             className="mt-4 grid gap-4 sm:grid-cols-2"
             onSubmit={async (event) => {

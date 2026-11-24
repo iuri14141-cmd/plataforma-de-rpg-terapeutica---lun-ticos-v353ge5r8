@@ -8,6 +8,10 @@ export type TestMission = {
   objective: string
   status: string
   tenant_id: string
+  group_min?: number
+  group_max?: number
+  sessions_total?: number
+  frequency?: string
   request_id: string
   created_at: string
   event_id: string
@@ -60,6 +64,10 @@ export async function listTenantMissions(): Promise<TestMission[]> {
       objective: string
       status: string
       tenant_id: string
+      group_min?: number
+      group_max?: number
+      sessions_total?: number
+      frequency?: string
       created: string
     }>
   }>('/api/collections/test_missions/records', {
@@ -74,6 +82,10 @@ export async function listTenantMissions(): Promise<TestMission[]> {
     objective: item.objective,
     status: item.status,
     tenant_id: item.tenant_id,
+    group_min: item.group_min,
+    group_max: item.group_max,
+    sessions_total: item.sessions_total,
+    frequency: item.frequency,
     request_id: '',
     created_at: item.created,
     event_id: '',

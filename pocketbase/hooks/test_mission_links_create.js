@@ -1,8 +1,13 @@
-// Vínculo manual missão–participante (F1-T08, CA-1-12).
-// Champion do tenant da sessão associa participante do MESMO tenant a uma
-// missão do MESMO tenant. Idempotente: reenvio do par ativo retorna o vínculo
-// existente (HTTP 200 already_linked). Vínculo cruzado é negado sem conteúdo
-// do alvo e auditado. Confirmação só após persistência do vínculo e do evento.
+// Vínculo manual missão–participante (F1-T08, CA-1-12) + limite de campanha
+// de grupo (F2-T05). Champion do tenant da sessão associa participante do
+// MESMO tenant a uma missão do MESMO tenant. Idempotente: reenvio do par
+// ativo retorna o vínculo existente (HTTP 200 already_linked). Vínculo
+// cruzado é negado sem conteúdo do alvo e auditado (RN-1.02). Campanha de
+// grupo (F2-T05): a missão de grupo aceita vínculo somente enquanto o
+// número de participantes ativos for menor que group_max (6); acima disso
+// responde 409 sem criar registro. O mínimo (3) não bloqueia o cadastro —
+// a composição é decisão manual do Champion e o painel mostra o grupo
+// incompleto. Confirmação só após persistência do vínculo e do evento.
 routerAdd(
   'POST',
   '/backend/v1/test-mission-links',
@@ -119,6 +124,28 @@ routerAdd(
         request_id: requestId,
         already_linked: true,
       })
+    }
+
+    // Limite de campanha de grupo (F2-T05): conta participantes ativos da
+    // missão de grupo; acima de group_max (6) nega sem criar registro.
+    if (mission.getString('modality') === 'grupo') {
+      const groupMax = mission.getInt('group_max', 6)
+      let activeCount = 0
+      try {
+        activeCount = $app.countRecordsByFilter(
+          'test_mission_links',
+          "mission_id = '" + missionId.replace(/'/g, "''") + "' && status = 'active'",
+        )
+      } catch (_) {
+        activeCount = 0
+      }
+      if (activeCount >= groupMax) {
+        return e.json(409, {
+          error: 'campanha de grupo cheia (' + activeCount + '/' + groupMax + ')',
+          active_count: activeCount,
+          group_max: groupMax,
+        })
+      }
     }
 
     const record = new Record($app.findCollectionByNameOrId('test_mission_links'))
