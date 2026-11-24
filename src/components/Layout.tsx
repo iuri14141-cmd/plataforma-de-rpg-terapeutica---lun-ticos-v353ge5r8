@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import AppShellNav from '@/components/AppShellNav'
 import { Outlet } from 'react-router-dom'
@@ -13,10 +14,10 @@ export default function Layout() {
           </span>
           <nav className="ml-auto flex items-center gap-2" aria-label="Navegação principal">
             <Button asChild variant="ghost" size="sm">
-              <a href="/">Ambiente de teste</a>
+              <Link to="/">Início</Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <a href="/clientes">Clientes</a>
+              <Link to="/clientes">Clientes</Link>
             </Button>
           </nav>
         </div>

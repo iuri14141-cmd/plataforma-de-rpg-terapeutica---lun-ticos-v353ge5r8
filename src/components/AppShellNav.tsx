@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Ambiente de teste' },
+  { to: '/', label: 'Início' },
   { to: '/clientes', label: 'Clientes' },
 ]
 
