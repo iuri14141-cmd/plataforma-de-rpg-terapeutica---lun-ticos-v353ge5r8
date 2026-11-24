@@ -66,13 +66,21 @@ routerAdd(
 
     // Elegibilidade decidida server-side: a decisão MAIS RECENTE da ficha
     // (append-only) deve ser elegivel. O cliente não envia elegibilidade.
+    // NOTA (debug rodada 2): findFirstRecordByFilter NAO aceita ordenacao —
+    // a chamada anterior com '-created' ignorava o sort e avaliava a decisão
+    // MAIS ANTIGA (ordem de inserção), negando encaminhamento de fichas cuja
+    // primeira decisão não era elegivel mesmo com a mais recente sendo.
+    // Correto: findRecordsByFilter(collection, filter, sort, limit, offset).
     let latestDecision = null
     try {
-      latestDecision = $app.findFirstRecordByFilter(
+      const decisions = $app.findRecordsByFilter(
         'test_screening_decisions',
         "submission_id = '" + submissionId.replace(/'/g, "''") + "'",
         '-created',
+        1,
+        0,
       )
+      latestDecision = decisions.length > 0 ? decisions[0] : null
     } catch (_) {
       latestDecision = null
     }
