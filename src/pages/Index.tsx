@@ -20,6 +20,12 @@ import {
   type ScreeningSubmission,
 } from '@/services/screening'
 import {
+  createScreeningDecision,
+  getScreeningDecisionTimeline,
+  type ScreeningDecision,
+  type ScreeningDecisionTimeline,
+} from '@/services/decisions'
+import {
   promoteTestParticipant,
   updateTestParticipant,
   getParticipantEvents,
@@ -47,7 +53,7 @@ import {
   type MissionLinkEventView,
 } from '@/services/missionLinks'
 
-const APP_VERSION = '0.0.30'
+const APP_VERSION = '0.0.31'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -210,6 +216,16 @@ function ProtectedTestAccess({
   const [screeningMessage, setScreeningMessage] = useState('')
   const [screeningError, setScreeningError] = useState('')
   const [screeningWorking, setScreeningWorking] = useState(false)
+  const [decisionFor, setDecisionFor] = useState<string | null>(null)
+  const [decisionChoice, setDecisionChoice] = useState<'elegivel' | 'nao_elegivel' | 'pendente'>(
+    'elegivel',
+  )
+  const [decisionReason, setDecisionReason] = useState('')
+  const [decisionMessage, setDecisionMessage] = useState('')
+  const [decisionError, setDecisionError] = useState('')
+  const [workingDecision, setWorkingDecision] = useState(false)
+  const [decisionTimeline, setDecisionTimeline] = useState<ScreeningDecisionTimeline | null>(null)
+  const [decisionTimelineFor, setDecisionTimelineFor] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -522,7 +538,9 @@ function ProtectedTestAccess({
           <p className="mt-1 text-sm text-slate-400">
             Formulário inicial de triagem com dados sintéticos. Sem campo de saúde: apenas ciência
             declarada (não substitui psicólogo/psiquiatra; não há diagnósticos). A fila mostra o
-            essencial de cada ficha, com estado, do mais antigo para o mais novo.
+            essencial de cada ficha, com estado, do mais antigo para o mais novo. A decisão de
+            triagem (F2-T04) é sempre sua: cada registro mostra quem decidiu, quando e por quê, e a
+            decisão anterior nunca é apagada.
           </p>
           <form
             className="mt-4 grid gap-4 sm:grid-cols-2"
@@ -749,6 +767,143 @@ function ProtectedTestAccess({
                       <p className="mt-1 text-xs text-slate-500">{item.created_at}</p>
                     </div>
                   </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(['elegivel', 'nao_elegivel', 'pendente'] as const).map((choice) => (
+                      <Button
+                        key={choice}
+                        size="small"
+                        variant="secondary"
+                        disabled={workingDecision}
+                        onClick={() => {
+                          setDecisionFor(item.submission_id)
+                          setDecisionChoice(choice)
+                          setDecisionReason('')
+                          setDecisionError('')
+                          setDecisionMessage('')
+                        }}
+                      >
+                        {choice === 'elegivel'
+                          ? 'Marcar elegível'
+                          : choice === 'nao_elegivel'
+                            ? 'Marcar não elegível'
+                            : 'Marcar pendente'}
+                      </Button>
+                    ))}
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      disabled={workingDecision}
+                      onClick={async () => {
+                        setWorkingDecision(true)
+                        setDecisionError('')
+                        try {
+                          const timeline = await getScreeningDecisionTimeline(item.submission_id)
+                          setDecisionTimeline(timeline)
+                          setDecisionTimelineFor(item.submission_id)
+                        } catch (requestError) {
+                          const err = requestError as {
+                            response?: { error?: string }
+                            data?: { error?: string }
+                          }
+                          const errorBody = err?.response ?? err?.data ?? {}
+                          setDecisionError(errorBody.error ?? getErrorMessage(requestError))
+                        } finally {
+                          setWorkingDecision(false)
+                        }
+                      }}
+                    >
+                      Ver decisões
+                    </Button>
+                  </div>
+                  {decisionFor === item.submission_id && (
+                    <form
+                      className="mt-3 space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-3"
+                      onSubmit={async (event) => {
+                        event.preventDefault()
+                        setDecisionError('')
+                        setDecisionMessage('')
+                        setWorkingDecision(true)
+                        try {
+                          const result = await createScreeningDecision(
+                            item.submission_id,
+                            decisionChoice,
+                            decisionReason.trim(),
+                          )
+                          setDecisionMessage(
+                            `Decisão registrada: ${result.decision} · por ${result.decided_by} · ${result.created_at}`,
+                          )
+                          setDecisionFor(null)
+                          setDecisionReason('')
+                          const queue = await getScreeningQueue()
+                          setScreeningQueue(queue)
+                        } catch (requestError) {
+                          const err = requestError as {
+                            response?: { error?: string }
+                            data?: { error?: string }
+                          }
+                          const errorBody = err?.response ?? err?.data ?? {}
+                          setDecisionError(errorBody.error ?? getErrorMessage(requestError))
+                        } finally {
+                          setWorkingDecision(false)
+                        }
+                      }}
+                    >
+                      <p className="text-xs font-medium text-slate-200">
+                        Decisão: {decisionChoice} — a justificativa é obrigatória (quem, quando e
+                        por quê ficam registrados; a decisão anterior nunca é apagada).
+                      </p>
+                      <textarea
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                        value={decisionReason}
+                        onChange={(event) => setDecisionReason(event.target.value)}
+                        placeholder="Justificativa da decisão (texto livre)"
+                        required
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={workingDecision}>
+                          {workingDecision ? 'Registrando…' : 'Registrar decisão'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={workingDecision}
+                          onClick={() => setDecisionFor(null)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                  {decisionError && (
+                    <p
+                      role="alert"
+                      className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+                    >
+                      {decisionError}
+                    </p>
+                  )}
+                  {decisionMessage && (
+                    <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+                      {decisionMessage}
+                    </p>
+                  )}
+                  {decisionTimelineFor === item.submission_id && decisionTimeline && (
+                    <ol className="mt-3 space-y-2 border-l border-slate-700 pl-4 text-sm text-slate-300">
+                      {decisionTimeline.items.length === 0 && (
+                        <li className="text-slate-500">Nenhuma decisão registrada ainda.</li>
+                      )}
+                      {decisionTimeline.items.map((entry) => (
+                        <li key={entry.decision_id}>
+                          <span className="font-medium text-cyan-300">{entry.decision}</span>
+                          {' · '}
+                          <span className="text-slate-400">
+                            {entry.created_at} · decidido por {entry.decided_by}
+                          </span>
+                          <p className="text-xs text-slate-500">Justificativa: {entry.reason}</p>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </li>
               ))}
             </ul>
