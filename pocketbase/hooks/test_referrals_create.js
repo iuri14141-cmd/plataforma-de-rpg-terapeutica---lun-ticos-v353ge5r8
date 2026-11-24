@@ -1,10 +1,18 @@
-// Encaminhamento da ficha elegível (F2-T05, plano oficial fase_2.md SHA cc435e3a).
+// Encaminhamento da ficha elegível (F2-T05, plano oficial fase_2.md SHA
+// 3017496809184ef60c3267cf468e4fbe96ffddf5 + EMENDA E-F2-20261124-01).
 // O champion autenticado encaminha uma ficha de triagem ELEGÍVEL do SEU tenant
 // para atendimento individual ou grupo; o tenant vem SEMPRE da sessão. A
 // elegibilidade é decidida server-side pela decisão mais recente da ficha
 // (nunca pelo corpo do cliente). Append-only: cada encaminhamento é um novo
 // registro com quem encaminhou (referred_by = sessão), quando (created) e por
 // quê (reason obrigatória). Auditoria RN-2.02; confirmação só após save.
+//
+// PROMOÇÃO AUTOMÁTICA (emenda E-F2-20261124-01): ao registrar o encaminhamento,
+// o sistema cria o participante correspondente NO MESMO ATO — idempotente por
+// submission_id (reencaminhamento não cria segundo participante), com evento
+// participant_registered append-only (quem, quando e por quê) e vínculo
+// identity_id quando o contact_key da ficha casa com uma identidade ativa do
+// tenant. A promoção manual antiga via interesse (F1-T05) permanece intacta.
 routerAdd(
   'POST',
   '/backend/v1/test-referrals',
@@ -77,6 +85,85 @@ routerAdd(
 
     const requestId = e.request.id || $security.randomString(16)
 
+    // PROMOÇÃO AUTOMÁTICA (emenda E-F2-20261124-01): idempotente por
+    // tenant + contact_key — se a ficha já tem participante no tenant,
+    // reencaminhamento não cria segundo registro (mesma chave de dedup da
+    // triagem, RN-1.07).
+    let promotedParticipant = null
+    try {
+      promotedParticipant = $app.findFirstRecordByFilter(
+        'test_participants',
+        "tenant_id = '" +
+          authTenant.replace(/'/g, "''") +
+          "' && contact_key = '" +
+          submission.getString('contact_key').replace(/'/g, "''") +
+          "'",
+      )
+    } catch (_) {
+      promotedParticipant = null
+    }
+
+    let participantId = ''
+    let participantCreated = false
+    let participantEventId = ''
+
+    if (promotedParticipant) {
+      participantId = promotedParticipant.id
+    } else {
+      // Vínculo determinístico com identidade sintética (mesma disciplina da
+      // F1-T08): contact_key da ficha casa com e-mail de identidade ativa do
+      // tenant → participante nasce vinculado a essa identidade.
+      let identityId = ''
+      try {
+        const identity = $app.findFirstRecordByFilter(
+          'test_identities',
+          "tenant_id = '" +
+            authTenant.replace(/'/g, "''") +
+            "' && email = '" +
+            submission.getString('contact_key').replace(/'/g, "''").toLowerCase() +
+            "' && status = 'active'",
+        )
+        identityId = identity.id
+      } catch (_) {
+        identityId = ''
+      }
+
+      const participant = new Record($app.findCollectionByNameOrId('test_participants'))
+      participant.set('fixture_key', 'participant-' + $security.randomString(10))
+      participant.set('tenant_id', authTenant)
+      participant.set('interest_id', submission.getString('request_id'))
+      participant.set('display_name', submission.getString('display_name'))
+      participant.set('contact_key', submission.getString('contact_key'))
+      participant.set('lifecycle_status', 'participant_registered')
+      participant.set('identity_id', identityId)
+      $app.save(participant)
+      // Nota: interest_id recebe o request_id do encaminhamento (a coleção
+      // test_participants exige relation a test_interests; o valor é apenas
+      // referencial de rastreio e não cria vínculo com a F1).
+      participantId = participant.id
+      participantCreated = true
+
+      // Evento append-only com quem (actor), quando (created) e por quê
+      // (changed_fields.reason = justificativa do encaminhamento).
+      const participantEvent = new Record($app.findCollectionByNameOrId('test_participant_events'))
+      participantEvent.set('event_id', 'evt-' + $security.randomString(12))
+      participantEvent.set('participant_id', participant.id)
+      participantEvent.set('actor_id', auth.id)
+      participantEvent.set('event_type', 'participant_registered')
+      participantEvent.set('request_id', requestId)
+      participantEvent.set(
+        'changed_fields',
+        JSON.stringify({
+          display_name: submission.getString('display_name'),
+          origin: 'screening_referral',
+          referral_reason: reason,
+          destination: destination,
+        }),
+      )
+      $app.save(participantEvent)
+      participantEventId = participantEvent.id
+    }
+
     const record = new Record($app.findCollectionByNameOrId('test_referrals'))
     record.set('referral_id', 'ref-' + $security.randomString(12))
     record.set('submission_id', submission.id)
@@ -106,6 +193,9 @@ routerAdd(
       destination: destination,
       reason: reason,
       referred_by: auth.id,
+      participant_id: participantId,
+      participant_created: participantCreated,
+      participant_event_id: participantEventId,
       request_id: requestId,
       created_at: record.getString('created'),
       audit_event_id: audit.id,

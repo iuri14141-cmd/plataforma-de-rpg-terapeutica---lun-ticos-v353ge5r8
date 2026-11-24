@@ -977,8 +977,17 @@ function ProtectedTestAccess({
                             referralReason.trim(),
                           )
                           setReferralMessage(
-                            `Encaminhamento registrado: ${result.destination} · por ${result.referred_by} · ${result.created_at}`,
+                            result.participant_created
+                              ? `Encaminhamento registrado: ${result.destination} · participante criado automaticamente (${result.participant_id.slice(0, 8)}…) · por ${result.referred_by} · ${result.created_at}`
+                              : `Encaminhamento registrado: ${result.destination} · participante já existia (idempotente) · por ${result.referred_by} · ${result.created_at}`,
                           )
+                          // Recarrega a lista de participantes do tenant para
+                          // a ficha encaminhada aparecer nos vínculos.
+                          try {
+                            setTenantParticipants(await listTenantParticipants())
+                          } catch (_) {
+                            // falha de recarga não invalida o encaminhamento
+                          }
                           setReferralFor(null)
                           setReferralReason('')
                           const queue = await getScreeningQueue()
