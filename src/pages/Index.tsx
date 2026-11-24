@@ -14,6 +14,12 @@ import {
 } from '@/services/interests'
 import { getLatestTenantInterest } from '@/services/interestQuery'
 import {
+  createScreeningSubmission,
+  getScreeningQueue,
+  type ScreeningQueue,
+  type ScreeningSubmission,
+} from '@/services/screening'
+import {
   promoteTestParticipant,
   updateTestParticipant,
   getParticipantEvents,
@@ -41,7 +47,7 @@ import {
   type MissionLinkEventView,
 } from '@/services/missionLinks'
 
-const APP_VERSION = '0.0.29'
+const APP_VERSION = '0.0.30'
 
 const roleLabels: Record<string, string> = {
   champion: 'Champion',
@@ -191,6 +197,19 @@ function ProtectedTestAccess({
     error?: string
   } | null>(null)
   const [probingLink, setProbingLink] = useState(false)
+  const [screeningName, setScreeningName] = useState('')
+  const [screeningContact, setScreeningContact] = useState('')
+  const [screeningMotivation, setScreeningMotivation] = useState('')
+  const [screeningGoal, setScreeningGoal] = useState('')
+  const [screeningAckReplacement, setScreeningAckReplacement] = useState(false)
+  const [screeningAckDiagnosis, setScreeningAckDiagnosis] = useState(false)
+  const [screeningConsentRecording, setScreeningConsentRecording] = useState(false)
+  const [screeningConsentConfidentiality, setScreeningConsentConfidentiality] = useState(false)
+  const [screeningResult, setScreeningResult] = useState<ScreeningSubmission | null>(null)
+  const [screeningQueue, setScreeningQueue] = useState<ScreeningQueue | null>(null)
+  const [screeningMessage, setScreeningMessage] = useState('')
+  const [screeningError, setScreeningError] = useState('')
+  const [screeningWorking, setScreeningWorking] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -495,6 +514,244 @@ function ProtectedTestAccess({
                 </div>
               </dl>
             </div>
+          )}
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="text-lg font-semibold">Triagem (F2-T03)</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Formulário inicial de triagem com dados sintéticos. Sem campo de saúde: apenas ciência
+            declarada (não substitui psicólogo/psiquiatra; não há diagnósticos). A fila mostra o
+            essencial de cada ficha, com estado, do mais antigo para o mais novo.
+          </p>
+          <form
+            className="mt-4 grid gap-4 sm:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              setScreeningError('')
+              setScreeningMessage('')
+              setScreeningWorking(true)
+              try {
+                const result = await createScreeningSubmission({
+                  display_name: screeningName.trim(),
+                  contact_key: screeningContact.trim(),
+                  motivation: screeningMotivation.trim(),
+                  goal: screeningGoal.trim(),
+                  ack_not_replacement: screeningAckReplacement,
+                  ack_no_diagnosis: screeningAckDiagnosis,
+                  consent_recording: screeningConsentRecording,
+                  consent_confidentiality: screeningConsentConfidentiality,
+                })
+                setScreeningResult(result)
+                if (result.duplicate) {
+                  setScreeningMessage('Submissão já existente para esta chave (idempotente).')
+                } else {
+                  setScreeningMessage('Submissão registrada na fila de triagem.')
+                }
+                const queue = await getScreeningQueue()
+                setScreeningQueue(queue)
+              } catch (requestError) {
+                const err = requestError as {
+                  response?: { error?: string }
+                  data?: { error?: string }
+                }
+                const errorBody = err?.response ?? err?.data ?? {}
+                setScreeningError(errorBody.error ?? getErrorMessage(requestError))
+              } finally {
+                setScreeningWorking(false)
+              }
+            }}
+          >
+            <label className="block text-sm font-medium text-slate-200">
+              Nome sintético
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={screeningName}
+                onChange={(event) => setScreeningName(event.target.value)}
+                placeholder="Carla Teste C"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-200">
+              Chave de contato sintética
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={screeningContact}
+                onChange={(event) => setScreeningContact(event.target.value)}
+                placeholder="carla.c@tests.invalid"
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-200 sm:col-span-2">
+              O que motivou você a procurar o RPG terapêutico?
+              <textarea
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={screeningMotivation}
+                onChange={(event) => setScreeningMotivation(event.target.value)}
+                placeholder="Resposta de teste — nada real nesta fase."
+                required
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate-200 sm:col-span-2">
+              O que você pretende com a terapia?
+              <textarea
+                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                value={screeningGoal}
+                onChange={(event) => setScreeningGoal(event.target.value)}
+                placeholder="Resposta de teste — nada real nesta fase."
+                required
+              />
+            </label>
+            <div className="sm:col-span-2 space-y-2 text-sm text-slate-200">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={screeningAckReplacement}
+                  onChange={(event) => setScreeningAckReplacement(event.target.checked)}
+                  required
+                />
+                <span>
+                  Declaro ciência de que o RPG terapêutico não substitui psicólogo ou psiquiatra.
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={screeningAckDiagnosis}
+                  onChange={(event) => setScreeningAckDiagnosis(event.target.checked)}
+                  required
+                />
+                <span>Declaro ciência de que o atendimento não inclui diagnósticos.</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={screeningConsentRecording}
+                  onChange={(event) => setScreeningConsentRecording(event.target.checked)}
+                  required
+                />
+                <span>Autorizo a gravação das sessões de RPG terapêutico.</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={screeningConsentConfidentiality}
+                  onChange={(event) => setScreeningConsentConfidentiality(event.target.checked)}
+                  required
+                />
+                <span>
+                  Comprometo-me a manter sigilo sobre o comportamento dos demais participantes.
+                </span>
+              </label>
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={screeningWorking}>
+                {screeningWorking ? 'Enviando…' : 'Enviar submissão de triagem'}
+              </Button>
+            </div>
+          </form>
+          {screeningError && (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-900 bg-red-950/60 p-3 text-sm text-red-200"
+            >
+              {screeningError}
+            </p>
+          )}
+          {screeningMessage && (
+            <p className="mt-3 rounded-lg border border-emerald-900 bg-emerald-950/40 p-3 text-sm text-emerald-200">
+              {screeningMessage}
+            </p>
+          )}
+          {screeningResult && !screeningResult.duplicate && (
+            <div className="mt-4 rounded-lg border border-emerald-900 bg-emerald-950/40 p-4 text-sm text-emerald-100">
+              <p className="font-semibold">Submissão registrada</p>
+              <dl className="mt-2 space-y-1 text-slate-200">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">ID</dt>
+                  <dd>{screeningResult.submission_id}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Estado</dt>
+                  <dd>{screeningResult.status}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Timestamp</dt>
+                  <dd>{screeningResult.created_at}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-slate-400">Auditoria</dt>
+                  <dd>{screeningResult.audit_event_id}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Button
+              disabled={screeningWorking}
+              onClick={async () => {
+                setScreeningWorking(true)
+                setScreeningError('')
+                try {
+                  const queue = await getScreeningQueue()
+                  setScreeningQueue(queue)
+                } catch (requestError) {
+                  const err = requestError as {
+                    response?: { error?: string }
+                    data?: { error?: string }
+                  }
+                  const errorBody = err?.response ?? err?.data ?? {}
+                  setScreeningError(errorBody.error ?? getErrorMessage(requestError))
+                } finally {
+                  setScreeningWorking(false)
+                }
+              }}
+            >
+              {screeningWorking ? 'Carregando…' : 'Atualizar fila de triagem'}
+            </Button>
+            {screeningQueue && (
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                {screeningQueue.count} ficha(s) na fila
+              </span>
+            )}
+          </div>
+          {screeningQueue && screeningQueue.items.length === 0 && (
+            <p className="mt-4 rounded-lg border border-amber-900 bg-amber-950/40 p-4 text-sm text-amber-100">
+              Nenhuma submissão na fila deste tenant.
+            </p>
+          )}
+          {screeningQueue && screeningQueue.items.length > 0 && (
+            <ul className="mt-4 space-y-2 text-sm text-slate-300">
+              {screeningQueue.items.map((item) => (
+                <li
+                  key={item.submission_id}
+                  className="rounded-lg border border-slate-800 bg-slate-950 p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-slate-100">
+                        {item.display_name} · {item.contact_key}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">Motivação: {item.motivation}</p>
+                      <p className="text-xs text-slate-400">Objetivo: {item.goal}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Ciências/consentimentos: não-substituição{' '}
+                        {item.ack_not_replacement ? '✓' : '✗'} · sem diagnóstico{' '}
+                        {item.ack_no_diagnosis ? '✓' : '✗'} · gravação{' '}
+                        {item.consent_recording ? '✓' : '✗'} · sigilo{' '}
+                        {item.consent_confidentiality ? '✓' : '✗'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                        {item.status}
+                      </span>
+                      <p className="mt-1 text-xs text-slate-500">{item.created_at}</p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
 
