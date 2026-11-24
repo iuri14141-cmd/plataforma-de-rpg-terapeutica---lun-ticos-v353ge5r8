@@ -56,6 +56,7 @@ import {
   type MissionLink,
   type TenantParticipant,
   type MissionLinkEventView,
+  type ParticipantMissionView as ParticipantMissionViewType,
 } from '@/services/missionLinks'
 
 const APP_VERSION = '0.0.32'
@@ -303,7 +304,7 @@ function ProtectedTestAccess({
                   const errorBody = err?.response ?? err?.data ?? {}
                   setProbe({
                     outcome: 'denied',
-                    rule_id: errorBody.rule_id ?? errorBody.data?.rule_id,
+                    rule_id: errorBody.rule_id,
                     error: errorBody.error ?? getErrorMessage(requestError),
                   })
                 } finally {
@@ -415,7 +416,7 @@ function ProtectedTestAccess({
           )}
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
-              size="small"
+              size="sm"
               variant="secondary"
               disabled={demoWorking}
               onClick={async () => {
@@ -786,7 +787,7 @@ function ProtectedTestAccess({
                     {(['elegivel', 'nao_elegivel', 'pendente'] as const).map((choice) => (
                       <Button
                         key={choice}
-                        size="small"
+                        size="sm"
                         variant="secondary"
                         disabled={workingDecision}
                         onClick={() => {
@@ -805,7 +806,7 @@ function ProtectedTestAccess({
                       </Button>
                     ))}
                     <Button
-                      size="small"
+                      size="sm"
                       variant="secondary"
                       disabled={workingDecision}
                       onClick={async () => {
@@ -922,7 +923,7 @@ function ProtectedTestAccess({
                   {item.status === 'screened' && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
-                        size="small"
+                        size="sm"
                         variant="secondary"
                         disabled={workingReferral}
                         onClick={() => {
@@ -936,7 +937,7 @@ function ProtectedTestAccess({
                         Encaminhar
                       </Button>
                       <Button
-                        size="small"
+                        size="sm"
                         variant="secondary"
                         disabled={workingReferral}
                         onClick={async () => {
@@ -1157,7 +1158,7 @@ function ProtectedTestAccess({
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
-                  size="small"
+                  size="sm"
                   variant="secondary"
                   disabled={workingParticipant}
                   onClick={async () => {
@@ -1191,7 +1192,7 @@ function ProtectedTestAccess({
                 </Button>
                 {participant.lifecycle_status !== 'cancelled' && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingParticipant}
                     onClick={async () => {
@@ -1227,7 +1228,7 @@ function ProtectedTestAccess({
                 )}
                 {participant.lifecycle_status === 'cancelled' && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingParticipant}
                     onClick={async () => {
@@ -1262,7 +1263,7 @@ function ProtectedTestAccess({
                   </Button>
                 )}
                 <Button
-                  size="small"
+                  size="sm"
                   variant="secondary"
                   disabled={workingParticipant}
                   onClick={async () => {
@@ -1465,7 +1466,7 @@ function ProtectedTestAccess({
           )}
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
-              size="small"
+              size="sm"
               variant="secondary"
               disabled={workingMission}
               onClick={async () => {
@@ -1510,7 +1511,7 @@ function ProtectedTestAccess({
               <div className="mt-3 flex flex-wrap gap-2">
                 {mission.status === 'rascunho' && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingMission}
                     onClick={async () => {
@@ -1543,7 +1544,7 @@ function ProtectedTestAccess({
                 )}
                 {mission.status === 'ativa' && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingMission}
                     onClick={async () => {
@@ -1576,7 +1577,7 @@ function ProtectedTestAccess({
                 )}
                 {(mission.status === 'ativa' || mission.status === 'pausada') && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingMission}
                     onClick={async () => {
@@ -1609,7 +1610,7 @@ function ProtectedTestAccess({
                 )}
                 {mission.status === 'cancelada' && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingMission}
                     onClick={async () => {
@@ -1641,7 +1642,7 @@ function ProtectedTestAccess({
                   </Button>
                 )}
                 <Button
-                  size="small"
+                  size="sm"
                   variant="secondary"
                   disabled={workingMission}
                   onClick={async () => {
@@ -1693,7 +1694,7 @@ function ProtectedTestAccess({
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
-              size="small"
+              size="sm"
               variant="secondary"
               disabled={workingLink}
               onClick={async () => {
@@ -1845,7 +1846,7 @@ function ProtectedTestAccess({
               <div className="mt-3 flex flex-wrap gap-2">
                 {link.status === 'active' && (
                   <Button
-                    size="small"
+                    size="sm"
                     variant="secondary"
                     disabled={workingLink}
                     onClick={async () => {
@@ -1875,7 +1876,7 @@ function ProtectedTestAccess({
                   </Button>
                 )}
                 <Button
-                  size="small"
+                  size="sm"
                   variant="secondary"
                   disabled={workingLink}
                   onClick={async () => {
@@ -2003,7 +2004,7 @@ const ParticipantMissionView = ({
   user: { name?: string; email?: string; test_role?: string; tenant_id?: string }
   onSignOut: () => void
 }) => {
-  const [view, setView] = useState<ParticipantMissionView | null>(null)
+  const [view, setView] = useState<ParticipantMissionViewType | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 

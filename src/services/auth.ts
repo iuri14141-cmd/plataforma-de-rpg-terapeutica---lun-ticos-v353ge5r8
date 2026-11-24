@@ -30,5 +30,5 @@ export function signOut() {
 }
 
 export function currentUser(): AuthUser | null {
-  return pb.authStore.isValid ? (pb.authStore.record as AuthUser | null) : null
+  return pb.authStore.isValid ? (pb.authStore.record as unknown as AuthUser | null) : null
 }

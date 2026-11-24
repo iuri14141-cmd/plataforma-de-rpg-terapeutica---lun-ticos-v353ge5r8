@@ -14,12 +14,12 @@ export function useAuth() {
 
   useEffect(() => {
     const unsubscribe = pb.authStore.onChange((_token, record) => {
-      setUser(pb.authStore.isValid ? (record as AuthUser | null) : null)
+      setUser(pb.authStore.isValid ? (record as unknown as AuthUser | null) : null)
     })
 
     if (pb.authStore.isValid) {
       void refreshSession()
-        .then((record) => setUser(record as AuthUser | null))
+        .then((record) => setUser(record as unknown as AuthUser | null))
         .finally(() => setLoading(false))
     } else {
       if (pb.authStore.record) pb.authStore.clear()
@@ -31,8 +31,8 @@ export function useAuth() {
 
   async function signIn(email: string, password: string) {
     const result = await signInService(email, password)
-    setUser(result.record as AuthUser)
-    return result.record as AuthUser
+    setUser(result.record as unknown as AuthUser)
+    return result.record as unknown as AuthUser
   }
 
   function signOut() {

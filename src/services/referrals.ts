@@ -10,6 +10,8 @@ export type TestReferral = {
   request_id: string
   created_at: string
   audit_event_id: string
+  participant_created?: boolean
+  participant_id?: string
 }
 
 export async function createTestReferral(
